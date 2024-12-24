@@ -1,0 +1,22 @@
+.vc-custom-sounds-card {
+    padding: 1em 1em 0;
+}
+
+.vc-custom-sounds-id {
+    color: var(--text-muted);
+}
+
+.vc-custom-sounds-upload {
+    display: inline;
+}
+
+.vc-custom-sounds-seasonal-title {
+    margin-top: 16px;
+    padding-top: 8px;
+    border-top: 1px solid var(--background-modifier-accent);
+}
+
+.vc-custom-sounds-sound-section {
+    margin-bottom: 16px;
+}
+
