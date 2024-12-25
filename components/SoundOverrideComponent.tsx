@@ -4,7 +4,6 @@
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
-// SoundOverrideComponent.tsx
 import { classNameFactory } from "@api/Styles";
 import { makeRange } from "@components/PluginSettings/components";
 import { Margins } from "@utils/margins";
@@ -26,6 +25,22 @@ type FileInput = ComponentType<{
 const playSound: (id: string) => SoundPlayer = findByCodeLazy(".playWithListener().then");
 const FileInput: FileInput = findLazy(m => m.prototype?.activateUploadDialogue && m.prototype.setRef);
 const cl = classNameFactory("vc-custom-sounds-");
+
+const isValidAudioUrl = (url: string) => {
+    if (!url) return false;
+    if (url.startsWith("data:audio/")) return true;
+    const audioExtensions = [".mp3", ".wav", ".ogg", ".webm", ".flac"];
+    return audioExtensions.some(ext => url.toLowerCase().endsWith(ext));
+};
+
+const processUrl = (url: string) => {
+    if (!url) return "";
+    if (url.includes("github.com") && !url.includes("raw.githubusercontent.com")) {
+        return url.replace("github.com", "raw.githubusercontent.com")
+            .replace("/blob/", "/");
+    }
+    return url;
+};
 
 export function SoundOverrideComponent({ type, override, onChange, overrides }: {
     type: SoundType;
@@ -59,48 +74,59 @@ export function SoundOverrideComponent({ type, override, onChange, overrides }: 
     const renderSoundUploader = (currentOverride: SoundOverride) => (
         <>
             <Forms.FormTitle>Replacement Sound</Forms.FormTitle>
-            <Button
-                color={Button.Colors.PRIMARY}
-                disabled={!override.enabled}
-                className={classes(Margins.right8, Margins.bottom16, cl("upload"))}
-            >
-                Upload
-                <FileInput
-                    ref={fileInputRef}
-                    onChange={event => {
-                        event.stopPropagation();
-                        event.preventDefault();
-
-                        if (!event.currentTarget?.files?.length)
-                            return;
-
-                        const { files } = event.currentTarget;
-                        const file = files[0];
-
-                        const reader = new FileReader;
-                        reader.onload = () => {
-                            currentOverride.url = reader.result as string;
-                            onChange();
-                            update();
-                        };
-                        reader.readAsDataURL(file);
+            <div className={Margins.bottom16}>
+                <Button
+                    color={Button.Colors.PRIMARY}
+                    disabled={!override.enabled}
+                    className={classes(Margins.right8, cl("upload"))}
+                >
+                    Upload File
+                    <FileInput
+                        ref={fileInputRef}
+                        onChange={event => {
+                            event.stopPropagation();
+                            event.preventDefault();
+                            if (!event.currentTarget?.files?.length) return;
+                            const { files } = event.currentTarget;
+                            const file = files[0];
+                            const reader = new FileReader;
+                            reader.onload = () => {
+                                currentOverride.url = reader.result as string;
+                                onChange();
+                                update();
+                            };
+                            reader.readAsDataURL(file);
+                        }}
+                        filters={[{ extensions: ["mp3", "wav", "ogg", "webm", "flac"] }]}
+                    />
+                </Button>
+                <Button
+                    color={Button.Colors.RED}
+                    onClick={() => {
+                        currentOverride.url = "";
+                        onChange();
+                        update();
                     }}
-                    filters={[{ extensions: ["mp3", "wav", "ogg", "webm", "flac"] }]}
+                    disabled={!(override.enabled && currentOverride.url.length !== 0)}
+                    style={{ display: "inline" }}
+                >
+                    Clear
+                </Button>
+            </div>
+            <Forms.FormText className={Margins.bottom8}>
+                <input
+                    type="text"
+                    value={currentOverride.url?.startsWith("data:") ? "" : currentOverride.url}
+                    onChange={e => {
+                        const processedUrl = processUrl(e.target.value);
+                        currentOverride.url = processedUrl;
+                        onChange();
+                        update();
+                    }}
+                    placeholder="https://example.com/sound.mp3"
+                    className={classes(Margins.bottom16, cl("url-input"))}
                 />
-            </Button>
-            <Button
-                color={Button.Colors.RED}
-                onClick={() => {
-                    currentOverride.url = "";
-                    onChange();
-                    update();
-                }}
-                disabled={!(override.enabled && currentOverride.url.length !== 0)}
-                style={{ display: "inline" }}
-                className={classes(Margins.right8, Margins.bottom16)}
-            >
-                Clear
-            </Button>
+            </Forms.FormText>
             <Forms.FormTitle>Volume</Forms.FormTitle>
             <Slider
                 markers={makeRange(0, 100, 10)}
@@ -130,8 +156,21 @@ export function SoundOverrideComponent({ type, override, onChange, overrides }: 
         } else if (selectedSound.value === "halloween" || selectedSound.value === "winter") {
             const soundId = getSeasonalId(selectedSound.value);
             if (soundId) sound.current = playSound(soundId);
-        } else if (selectedSound.value === "custom" && override.enabled && override.url) {
-            sound.current = playSound(type.id);
+        } else if (selectedSound.value === "custom" && override.enabled) {
+            const processedUrl = processUrl(override.url);
+            if (isValidAudioUrl(processedUrl)) {
+                const audio = new Audio(processedUrl);
+                audio.volume = override.volume / 100;
+                audio.play();
+                sound.current = {
+                    play: () => audio.play(),
+                    pause: () => audio.pause(),
+                    stop: () => { audio.pause(); audio.currentTime = 0; },
+                    loop: () => { audio.loop = true; }
+                };
+            } else {
+                sound.current = playSound(type.id);
+            }
         }
     };
 
