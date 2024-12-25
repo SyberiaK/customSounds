@@ -28,3 +28,9 @@
     border-radius: 3px;
     color: var(--text-normal);
 }
+
+.vc-custom-sounds-buttons {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+}

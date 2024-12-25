@@ -1,10 +1,8 @@
+**NOW SUPPORTS BOTH AUDIO FILE UPLOADS AND AUDIO URLS, along with new and improved settings**
 > [!TIP]
-> **If you run into any issues, please feel free to message me on Discord: [scattrdblade](https://discord.com/users/678007540608532491)**
+> **If you run into any issues, please let me know on [Discord](https://discord.gg/jHDJaW9Gyz)**
 # Custom Sounds (Vencord)
-This is a Vencord plugin that allows you to replace any native Discord sound with a sound of your choice by going to the plugin's settings and pasting the URL of a valid audio file.
-> [!NOTE]
-> **The audio file must be a URL and not a local file.**<br/>
-You can find audio URLs on soundboard sites, or create your own GitHub repository, add an audio file, and paste the raw link to it in the plugin's settings.
+This is a Vencord plugin that allows you to customize any native Discord sound. Features audio file uploads, audio URL support, volume control, and sound preview.
 
 ## DOWNLOAD INSTRUCTIONS
 You can either __clone__ the repository OR __manually install__ it by downloading it as a zip file.<br/>
