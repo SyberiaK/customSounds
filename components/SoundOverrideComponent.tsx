@@ -111,9 +111,21 @@ export function SoundOverrideComponent({ type, override, onChange, overrides }: 
     // Add "Custom" at the end
     soundOptions.push({ value: "custom", label: "Custom" });
 
-    const [selectedSound, setSelectedSound] = React.useState({
-        value: override.selectedSound ?? "default",
-        label: soundOptions.find(opt => opt.value === (override.selectedSound ?? "default"))?.label ?? "Default"
+    const [selectedSound, setSelectedSound] = React.useState(() => {
+        const defaultValue = "default";
+        const defaultLabel = "Default";
+
+        if (!override) {
+            return { value: defaultValue, label: defaultLabel };
+        }
+
+        const value = override.selectedSound ?? defaultValue;
+        const option = soundOptions.find(opt => opt.value === value);
+
+        return {
+            value,
+            label: option?.label ?? defaultLabel
+        };
     });
 
     const renderSoundUploader = (currentOverride: SoundOverride) => (
