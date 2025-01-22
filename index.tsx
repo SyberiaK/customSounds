@@ -50,29 +50,6 @@ function resolveOverrideUrl(override: SoundOverride, type: SoundType): string {
 }
 
 const settings = definePluginSettings({
-    ...Object.fromEntries(
-        allSoundTypes.map(type => [
-            type.id,
-            {
-                type: OptionType.COMPONENT,
-                description: `Override settings for ${type.name}`,
-                default: makeEmptyOverride(),
-                component: () => (
-                    <SoundOverrideComponent
-                        type={type}
-                        override={settings.store[type.id] ?? makeEmptyOverride()}
-                        overrides={settings.store}
-                        onChange={async () => {
-                            settings.store[type.id] = {
-                                ...settings.store[type.id],
-                                url: resolveOverrideUrl(settings.store[type.id], type)
-                            };
-                        }}
-                    />
-                ),
-            },
-        ])
-    ),
     overrides: {
         type: OptionType.COMPONENT,
         description: "",
@@ -153,14 +130,10 @@ const settings = definePluginSettings({
             );
 
             return (
-                <>
+                <div>
                     <div className="vc-custom-sounds-buttons">
-                        <Button color={Button.Colors.BRAND} onClick={triggerFileUpload}>
-                            Import
-                        </Button>
-                        <Button color={Button.Colors.PRIMARY} onClick={downloadSettings}>
-                            Export
-                        </Button>
+                        <Button color={Button.Colors.BRAND} onClick={triggerFileUpload}>Import</Button>
+                        <Button color={Button.Colors.PRIMARY} onClick={downloadSettings}>Export</Button>
                         <input
                             ref={fileInputRef}
                             type="file"
@@ -188,17 +161,20 @@ const settings = definePluginSettings({
                                 overrides={settings.store}
                                 onChange={() => {
                                     return new Promise<void>(resolve => {
-                                        settings.store[type.id].url = resolveOverrideUrl(settings.store[type.id], type);
+                                        settings.store[type.id] = {
+                                            ...settings.store[type.id],
+                                            url: resolveOverrideUrl(settings.store[type.id], type)
+                                        };
                                         resolve();
                                     });
                                 }}
                             />
                         ))}
                     </div>
-                </>
+                </div>
             );
-        },
-    },
+        }
+    }
 });
 
 export function isOverriden(id: string): boolean {

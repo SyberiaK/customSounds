@@ -53,3 +53,7 @@
     flex-direction: column;
     gap: 16px;
 }
+
+.vc-custom-sounds-preview-controls {
+    display: flex;
+}

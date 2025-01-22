@@ -239,13 +239,21 @@ export function SoundOverrideComponent({ type, override, onChange, overrides }: 
             </Switch>
 
             <>
-                <Button
-                    color={Button.Colors.GREEN}
-                    className={Margins.bottom16}
-                    onClick={previewSound}
-                >
-                    Preview
-                </Button>
+                <div className={classes(cl("preview-controls"), Margins.bottom16)}>
+                    <Button
+                        color={Button.Colors.GREEN}
+                        onClick={previewSound}
+                    >
+                        Preview
+                    </Button>
+                    <Button
+                        color={Button.Colors.RED}
+                        onClick={() => sound.current?.stop()}
+                        className={Margins.left8}
+                    >
+                        Stop
+                    </Button>
+                </div>
 
                 <Forms.FormTitle>Volume</Forms.FormTitle>
                 <Slider
