@@ -224,11 +224,13 @@ export function SoundOverrideComponent({ type, override, onChange, overrides }: 
     return (
         <Card className={cl("card")}>
             <Switch
-                value={override.enabled}
+                value={override?.enabled ?? false}
                 onChange={value => {
-                    override.enabled = value;
-                    onChange();
-                    update();
+                    if (override) {
+                        override.enabled = value;
+                        onChange();
+                        update();
+                    }
                 }}
                 className={Margins.bottom16}
                 hideBorder={true}

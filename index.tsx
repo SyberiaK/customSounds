@@ -163,11 +163,13 @@ const settings = definePluginSettings({
                         <SoundOverrideComponent
                             key={`${type.id}-${resetTrigger}`}
                             type={type}
-                            override={settings.store[type.id]}
+                            override={settings.store[type.id] ?? makeEmptyOverride()}
                             overrides={settings.store}
                             onChange={() => {
                                 return new Promise<void>(resolve => {
-                                    settings.store[type.id].url = resolveOverrideUrl(settings.store[type.id], type);
+                                    if (settings.store[type.id]) {
+                                        settings.store[type.id].url = resolveOverrideUrl(settings.store[type.id], type);
+                                    }
                                     resolve();
                                 });
                             }}
