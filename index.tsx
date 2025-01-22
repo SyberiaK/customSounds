@@ -9,8 +9,6 @@ import "./styles.css";
 import { definePluginSettings } from "@api/Settings";
 import { classNameFactory } from "@api/Styles";
 import { Devs } from "@utils/constants";
-import { Margins } from "@utils/margins";
-import { classes } from "@utils/misc";
 import definePlugin, { OptionType } from "@utils/types";
 import { Button, Forms, React, showToast, TextInput } from "@webpack/common";
 
@@ -52,6 +50,29 @@ function resolveOverrideUrl(override: SoundOverride, type: SoundType): string {
 }
 
 const settings = definePluginSettings({
+    ...Object.fromEntries(
+        allSoundTypes.map(type => [
+            type.id,
+            {
+                type: OptionType.COMPONENT,
+                description: `Override settings for ${type.name}`,
+                default: makeEmptyOverride(),
+                component: () => (
+                    <SoundOverrideComponent
+                        type={type}
+                        override={settings.store[type.id] ?? makeEmptyOverride()}
+                        overrides={settings.store}
+                        onChange={async () => {
+                            settings.store[type.id] = {
+                                ...settings.store[type.id],
+                                url: resolveOverrideUrl(settings.store[type.id], type)
+                            };
+                        }}
+                    />
+                ),
+            },
+        ])
+    ),
     overrides: {
         type: OptionType.COMPONENT,
         description: "",
@@ -149,32 +170,31 @@ const settings = definePluginSettings({
                         />
                     </div>
 
-                    <div className={classes(Margins.top8, Margins.bottom16)}>
+                    <div className={cl("search")}>
                         <Forms.FormTitle>Search Sounds</Forms.FormTitle>
                         <TextInput
                             value={searchQuery}
                             onChange={e => setSearchQuery(e)}
-                            placeholder="Search"
-                            className={cl("search-input")}
+                            placeholder="Search by name or ID"
                         />
                     </div>
 
-                    {filteredSoundTypes.map(type => (
-                        <SoundOverrideComponent
-                            key={`${type.id}-${resetTrigger}`}
-                            type={type}
-                            override={settings.store[type.id] ?? makeEmptyOverride()}
-                            overrides={settings.store}
-                            onChange={() => {
-                                return new Promise<void>(resolve => {
-                                    if (settings.store[type.id]) {
+                    <div className={cl("sounds-list")}>
+                        {filteredSoundTypes.map(type => (
+                            <SoundOverrideComponent
+                                key={`${type.id}-${resetTrigger}`}
+                                type={type}
+                                override={settings.store[type.id] ?? makeEmptyOverride()}
+                                overrides={settings.store}
+                                onChange={() => {
+                                    return new Promise<void>(resolve => {
                                         settings.store[type.id].url = resolveOverrideUrl(settings.store[type.id], type);
-                                    }
-                                    resolve();
-                                });
-                            }}
-                        />
-                    ))}
+                                        resolve();
+                                    });
+                                }}
+                            />
+                        ))}
+                    </div>
                 </>
             );
         },
