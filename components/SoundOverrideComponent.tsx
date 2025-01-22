@@ -89,7 +89,6 @@ export function SoundOverrideComponent({ type, override, onChange, overrides }: 
         { value: "default", label: "Default" },
     ];
 
-    // Additional Options
     if (type.seasonal) {
         if (type.seasonal.includes("call_ringing_beat")) {
             soundOptions.push({ value: "call_ringing_beat", label: "Beat (Rare)" });
@@ -108,7 +107,6 @@ export function SoundOverrideComponent({ type, override, onChange, overrides }: 
         }
     }
 
-    // Add "Custom" at the end
     soundOptions.push({ value: "custom", label: "Custom" });
 
     const [selectedSound, setSelectedSound] = React.useState(() => {
@@ -148,6 +146,7 @@ export function SoundOverrideComponent({ type, override, onChange, overrides }: 
                                 const file = event.currentTarget.files[0];
                                 const audioDataUrl = await readFileAsAudio(file);
                                 currentOverride.url = audioDataUrl;
+                                currentOverride.base64Data = audioDataUrl;
                                 onChange();
                                 update();
                             } catch (err) {
@@ -157,6 +156,7 @@ export function SoundOverrideComponent({ type, override, onChange, overrides }: 
                         filters={[{ name: "Audio Files", extensions: AUDIO_EXTENSIONS }]}
                     />
                 </Button>
+
                 <Button
                     color={Button.Colors.RED}
                     onClick={() => {

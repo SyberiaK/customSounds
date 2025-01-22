@@ -73,7 +73,7 @@ const settings = definePluginSettings({
                 const file = event.target.files?.[0];
                 if (file) {
                     const reader = new FileReader();
-                    reader.onload = (e: ProgressEvent<FileReader>) => {
+                    reader.onload = async (e: ProgressEvent<FileReader>) => {
                         try {
                             resetOverrides();
 
@@ -84,9 +84,10 @@ const settings = definePluginSettings({
                                     settings.store[setting.id] = {
                                         enabled: setting.enabled ?? false,
                                         selectedSound: setting.selectedSound ?? "default",
-                                        url: "",
+                                        url: setting.url || "",
+                                        base64Data: setting.base64Data || "",
                                         volume: setting.volume ?? 100,
-                                        useFile: setting.useFile ?? false
+                                        useFile: setting.useFile ?? false,
                                     };
                                 }
                             });
@@ -107,14 +108,18 @@ const settings = definePluginSettings({
             const downloadSettings = () => {
                 const settingsData = Object.entries(settings.store)
                     .filter(([key]) => key !== "overrides")
-                    .map(([key, value]) => ({
-                        id: key,
-                        enabled: value.enabled,
-                        selectedSound: value.selectedSound,
-                        url: value.url,
-                        volume: value.volume,
-                        useFile: value.useFile,
-                    }));
+                    .map(([key, value]) => {
+                        const soundType = allSoundTypes.find(type => type.id === key);
+                        return {
+                            id: key,
+                            enabled: value.enabled,
+                            selectedSound: value.selectedSound,
+                            url: value.selectedSound === "custom" ? value.url : soundType ? resolveOverrideUrl(value, soundType) : "",
+                            base64Data: value.base64Data || "",
+                            volume: value.volume,
+                            useFile: value.useFile,
+                        };
+                    });
                 const blob = new Blob([JSON.stringify(settingsData, null, 2)], { type: "application/json" });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
@@ -123,6 +128,7 @@ const settings = definePluginSettings({
                 a.click();
                 URL.revokeObjectURL(url);
             };
+
 
             const filteredSoundTypes = allSoundTypes.filter(type =>
                 type.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

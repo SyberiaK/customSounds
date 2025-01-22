@@ -25,6 +25,15 @@ export interface SoundPlayer {
     stop(): void;
 }
 
+export interface SoundOverride {
+    enabled: boolean;
+    selectedSound: string;
+    url: string;
+    base64Data?: string;
+    volume: number;
+    useFile: boolean;
+}
+
 export const seasonalSounds = {
     "halloween_call_calling": "https://canary.discord.com/assets/0950a7ea4f1dd037870b.mp3",
     "winter_call_calling": "https://canary.discord.com/assets/7b945e7be3f86c5b7c82.mp3",
