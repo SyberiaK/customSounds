@@ -1,4 +1,4 @@
-**NOW INCLUDES BUILT IN PRESETS FOR DISCORD'S SEASONAL SOUNDS, along with a new search bar and import/export options.**
+**NOW INCLUDES SEASONAL DISCORD SOUNDS, along with a search bar and import/export**
 > [!TIP]
 > **If you run into any issues, please let me know on [Discord](https://discord.gg/jHDJaW9Gyz)**
 # Custom Sounds (Vencord)
