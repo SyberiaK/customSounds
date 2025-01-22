@@ -10,7 +10,7 @@ import { Margins } from "@utils/margins";
 import { classes } from "@utils/misc";
 import { useForceUpdater } from "@utils/react";
 import { findByCodeLazy, findLazy } from "@webpack";
-import { Button, Card, Forms, React, Select, Slider, Switch, useRef } from "@webpack/common";
+import { Button, Card, Forms, React, Select, Slider, Switch } from "@webpack/common";
 import { ComponentType, Ref, SyntheticEvent } from "react";
 
 import { SoundOverride, SoundPlayer, SoundType } from "../types";
@@ -81,8 +81,8 @@ export function SoundOverrideComponent({ type, override, onChange, overrides }: 
     onChange: () => Promise<void>;
     overrides: Record<string, SoundOverride>;
 }) {
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const sound = useRef<SoundPlayer | null>(null);
+    const fileInputRef = React.useRef<HTMLInputElement>(null);
+    const sound = React.useRef<SoundPlayer | null>(null);
     const update = useForceUpdater();
 
     const soundOptions = [
@@ -172,18 +172,6 @@ export function SoundOverrideComponent({ type, override, onChange, overrides }: 
                     className={classes(Margins.bottom16, cl("url-input"))}
                 />
             </Forms.FormText>
-            <Forms.FormTitle>Volume</Forms.FormTitle>
-            <Slider
-                markers={makeRange(0, 100, 10)}
-                initialValue={currentOverride.volume}
-                onValueChange={value => {
-                    currentOverride.volume = value;
-                    onChange();
-                    update();
-                }}
-                className={Margins.bottom16}
-                disabled={!override.enabled}
-            />
         </>
     );
 
@@ -233,17 +221,30 @@ export function SoundOverrideComponent({ type, override, onChange, overrides }: 
                 className={Margins.bottom16}
                 hideBorder={true}
             >
-                {type.name} <span className={cl("id")}>({type.id})</span>
+                {type.name}
             </Switch>
 
             <>
                 <Button
-                    color={Button.Colors.PRIMARY}
+                    color={Button.Colors.GREEN}
                     className={Margins.bottom16}
                     onClick={previewSound}
                 >
                     Preview
                 </Button>
+
+                <Forms.FormTitle>Volume</Forms.FormTitle>
+                <Slider
+                    markers={makeRange(0, 100, 10)}
+                    initialValue={override.volume}
+                    onValueChange={value => {
+                        override.volume = value;
+                        onChange();
+                        update();
+                    }}
+                    className={Margins.bottom16}
+                    disabled={!override.enabled}
+                />
 
                 <Forms.FormTitle>Sound Type</Forms.FormTitle>
                 <Select
@@ -252,8 +253,8 @@ export function SoundOverrideComponent({ type, override, onChange, overrides }: 
                         const option = soundOptions.find(opt => opt.value === value) ?? soundOptions[0];
                         setSelectedSound(option);
                         override.selectedSound = option.value;
-                        if (option.value === "default") {
-                            override.url = ""; // Clear custom sound if "Default" is selected
+                        if (option.value === "default" || option.value === "custom  ") {
+                            override.url = "";
                         }
                         onChange();
                         update();

@@ -6,24 +6,50 @@
 
 import "./styles.css";
 
-import { DataStore } from "@api/index";
 import { definePluginSettings } from "@api/Settings";
+import { classNameFactory } from "@api/Styles";
 import { Devs } from "@utils/constants";
+import { Margins } from "@utils/margins";
+import { classes } from "@utils/misc";
 import definePlugin, { OptionType } from "@utils/types";
-import { Button, React, showToast } from "@webpack/common";
+import { Button, Forms, React, showToast, TextInput } from "@webpack/common";
 
 import { SoundOverrideComponent } from "./components/SoundOverrideComponent";
-import { makeEmptyOverride, SoundOverride, soundTypes } from "./types";
+import { makeEmptyOverride, seasonalSounds, SoundOverride, SoundType, soundTypes } from "./types";
 
-const OVERRIDES_KEY = "CustomSounds_overrides";
+const cl = classNameFactory("vc-custom-sounds-");
 
-let overrides: Record<string, SoundOverride> = soundTypes.reduce(
-    (result, sound) => ({
-        ...result,
-        [sound.id]: makeEmptyOverride(),
-    }),
-    {}
-);
+const allSoundTypes = soundTypes || [];
+
+function getSeasonalId(season: string, type: SoundType): string | null {
+    if (!type.seasonal) return null;
+    const seasonalId = type.seasonal.find(id => id.startsWith(`${season}_`));
+    return seasonalId || null;
+}
+
+function resolveOverrideUrl(override: SoundOverride, type: SoundType): string {
+    if (!override) return "";
+
+    switch (override.selectedSound) {
+        case "custom":
+            return override.url || "";
+        case "default":
+            return "";
+        default: {
+            if (type.seasonal) {
+                if (override.selectedSound in seasonalSounds) {
+                    return seasonalSounds[override.selectedSound];
+                }
+
+                const seasonalId = getSeasonalId(override.selectedSound, type);
+                if (seasonalId && seasonalId in seasonalSounds) {
+                    return seasonalSounds[seasonalId];
+                }
+            }
+            return "";
+        }
+    }
+}
 
 const settings = definePluginSettings({
     overrides: {
@@ -31,13 +57,13 @@ const settings = definePluginSettings({
         description: "",
         component: () => {
             const [resetTrigger, setResetTrigger] = React.useState(0);
+            const [searchQuery, setSearchQuery] = React.useState("");
             const fileInputRef = React.useRef<HTMLInputElement>(null);
 
             const resetOverrides = () => {
-                soundTypes.forEach(type => {
-                    overrides[type.id] = makeEmptyOverride();
+                allSoundTypes.forEach(type => {
+                    settings.store[type.id] = makeEmptyOverride();
                 });
-                DataStore.set(OVERRIDES_KEY, overrides);
                 setResetTrigger(prev => prev + 1);
             };
 
@@ -56,21 +82,18 @@ const settings = definePluginSettings({
                             const importedSettings = JSON.parse(e.target?.result as string);
 
                             importedSettings.forEach((setting: any) => {
-                                if (overrides[setting.id]) {
-                                    overrides[setting.id] = {
+                                if (setting.id in settings.store) {
+                                    settings.store[setting.id] = {
                                         enabled: setting.enabled ?? false,
                                         selectedSound: setting.selectedSound ?? "default",
-                                        url: setting.selectedSound === "custom" ? (setting.url || "") : "",
+                                        url: "",
                                         volume: setting.volume ?? 100,
                                         useFile: setting.useFile ?? false
                                     };
                                 }
                             });
 
-                            DataStore.set(OVERRIDES_KEY, overrides);
-
                             setResetTrigger(prev => prev + 1);
-
                             showToast("Settings imported successfully!");
                         } catch (error) {
                             console.error("Error importing settings:", error);
@@ -84,14 +107,16 @@ const settings = definePluginSettings({
             };
 
             const downloadSettings = () => {
-                const settingsData = Object.entries(overrides).map(([key, value]) => ({
-                    id: key,
-                    enabled: value.enabled,
-                    selectedSound: value.selectedSound,
-                    url: value.selectedSound === "custom" ? value.url : null,
-                    volume: value.volume,
-                    useFile: value.useFile,
-                }));
+                const settingsData = Object.entries(settings.store)
+                    .filter(([key]) => key !== "overrides")
+                    .map(([key, value]) => ({
+                        id: key,
+                        enabled: value.enabled,
+                        selectedSound: value.selectedSound,
+                        url: value.url,
+                        volume: value.volume,
+                        useFile: value.useFile,
+                    }));
                 const blob = new Blob([JSON.stringify(settingsData, null, 2)], { type: "application/json" });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement("a");
@@ -101,19 +126,18 @@ const settings = definePluginSettings({
                 URL.revokeObjectURL(url);
             };
 
+            const filteredSoundTypes = allSoundTypes.filter(type =>
+                type.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                type.id.toLowerCase().includes(searchQuery.toLowerCase())
+            );
+
             return (
                 <>
                     <div className="vc-custom-sounds-buttons">
-                        <Button
-                            color={Button.Colors.BRAND}
-                            onClick={triggerFileUpload}
-                        >
+                        <Button color={Button.Colors.BRAND} onClick={triggerFileUpload}>
                             Import
                         </Button>
-                        <Button
-                            color={Button.Colors.PRIMARY}
-                            onClick={downloadSettings}
-                        >
+                        <Button color={Button.Colors.PRIMARY} onClick={downloadSettings}>
                             Export
                         </Button>
                         <input
@@ -125,13 +149,28 @@ const settings = definePluginSettings({
                         />
                     </div>
 
-                    {soundTypes.map(type => (
+                    <div className={classes(Margins.top8, Margins.bottom16)}>
+                        <Forms.FormTitle>Search Sounds</Forms.FormTitle>
+                        <TextInput
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e)}
+                            placeholder="Search"
+                            className={cl("search-input")}
+                        />
+                    </div>
+
+                    {filteredSoundTypes.map(type => (
                         <SoundOverrideComponent
                             key={`${type.id}-${resetTrigger}`}
                             type={type}
-                            override={overrides[type.id]}
-                            overrides={overrides}
-                            onChange={() => DataStore.set(OVERRIDES_KEY, overrides)}
+                            override={settings.store[type.id]}
+                            overrides={settings.store}
+                            onChange={() => {
+                                return new Promise<void>(resolve => {
+                                    settings.store[type.id].url = resolveOverrideUrl(settings.store[type.id], type);
+                                    resolve();
+                                });
+                            }}
                         />
                     ))}
                 </>
@@ -141,14 +180,12 @@ const settings = definePluginSettings({
 });
 
 export function isOverriden(id: string): boolean {
-    return overrides[id]?.enabled ?? false;
+    return !!settings.store[id]?.enabled;
 }
 
 export function findOverride(id: string): SoundOverride | null {
-    const result = overrides[id];
-    if (!result?.enabled) return null;
-
-    return result;
+    const override = settings.store[id];
+    return override?.enabled ? override : null;
 }
 
 export default definePlugin({
@@ -156,23 +193,19 @@ export default definePlugin({
     description: "Customize Discord's sounds.",
     authors: [Devs.ScattrdBlade, Devs.TheKodeToad],
     patches: [
-        // sound class
         {
             find: 'Error("could not play audio")',
             replacement: [
-                // override URL
                 {
-                    match: /(?<=new Audio;\i\.src=)\i\([0-9]+\)\("\.\/"\.concat\(this\.name,"\.mp3"\)/,
-                    replace: "$self.findOverride(this.name)?.url || $&",
+                    match: /(?<=new Audio;\i\.src=)\i\([0-9]+\)\("\.\/"\.concat\(this\.name,"\.mp3"\)\)/,
+                    replace: "(() => { const override = $self.findOverride(this.name); return override?.url || $&; })()",
                 },
-                // override volume
                 {
                     match: /Math.min\(\i\.\i\.getOutputVolume\(\)\/100\*this\._volume/,
                     replace: "$& * ($self.findOverride(this.name)?.volume ?? 100) / 100",
                 },
             ],
         },
-        // force classic soundpack for overridden sounds
         {
             find: ".playWithListener().then",
             replacement: {
@@ -184,8 +217,4 @@ export default definePlugin({
     settings,
     findOverride,
     isOverriden,
-    async start() {
-        overrides = (await DataStore.get(OVERRIDES_KEY)) ?? {};
-        for (const type of soundTypes) overrides[type.id] ??= makeEmptyOverride();
-    },
 });
