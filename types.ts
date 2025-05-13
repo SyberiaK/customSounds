@@ -12,10 +12,12 @@ export interface SoundType {
 
 export interface SoundOverride {
     enabled: boolean;
-    url: string;
-    useFile: boolean;
-    volume: number;
     selectedSound: string;
+    url: string;
+    base64Data?: string; // Keep for migration from old versions
+    volume: number;
+    useFile: boolean;
+    selectedFileId?: string | null;
 }
 
 export interface SoundPlayer {
@@ -23,15 +25,6 @@ export interface SoundPlayer {
     play(): void;
     pause(): void;
     stop(): void;
-}
-
-export interface SoundOverride {
-    enabled: boolean;
-    selectedSound: string;
-    url: string;
-    base64Data?: string;
-    volume: number;
-    useFile: boolean;
 }
 
 export const seasonalSounds = {
@@ -127,9 +120,10 @@ export const soundTypes: readonly SoundType[] = [
 export function makeEmptyOverride(): SoundOverride {
     return {
         enabled: false,
-        useFile: false,
+        selectedSound: "default",
         url: "",
         volume: 100,
-        selectedSound: "default"
+        useFile: false,
+        selectedFileId: null
     };
 }

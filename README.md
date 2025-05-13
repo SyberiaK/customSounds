@@ -1,8 +1,8 @@
-**NOW INCLUDES SEASONAL DISCORD SOUNDS, along with a search bar and import/export**
+**New and improved UI. Added ability to save/upload multiple custom sounds. Optimized for better compatability.**
 > [!TIP]
 > **If you run into any issues, please let me know on [Discord](https://discord.gg/jHDJaW9Gyz)**
 # Custom Sounds (Vencord)
-This is a Vencord plugin that allows you to customize any native Discord sound. Features audio file uploads, audio URL support, built in Discord sound presets, volume control, sound preview, and sound settings import/export.
+This is a Vencord plugin that allows you to change any native Discord sound. Features custom audio uploads, built-in Discord presets, volume control, sound preview, and settings import/export.
 
 ## DOWNLOAD INSTRUCTIONS
 You can either __clone__ the repository OR __manually install__ it by downloading it as a zip file.<br/>
