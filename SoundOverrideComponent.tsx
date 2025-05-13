@@ -12,7 +12,7 @@ import { findByCodeLazy, findLazy } from "@webpack";
 import { Button, Card, Forms, React, Select, showToast, Slider, Switch } from "@webpack/common";
 import { ComponentType, Ref, SyntheticEvent } from "react";
 
-import { deleteAudio, getAllAudio, saveAudio } from "./audioStore";
+import { deleteAudio, getAllAudio, saveAudio, StoredAudioFile } from "./audioStore";
 import { refreshDataURI } from "./index";
 import { SoundOverride, SoundPlayer, SoundType } from "./types";
 
@@ -39,7 +39,7 @@ export function SoundOverrideComponent({ type, override, onChange }: {
     const fileInputRef = React.useRef<HTMLInputElement>(null);
     const update = useForceUpdater();
     const sound = React.useRef<SoundPlayer | null>(null);
-    const [files, setFiles] = React.useState<Record<string, { id: string; name: string; base64: string; type: string; }>>({});
+    const [files, setFiles] = React.useState<Record<string, StoredAudioFile>>({});
 
     React.useEffect(() => {
         getAllAudio().then(setFiles);

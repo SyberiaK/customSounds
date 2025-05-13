@@ -6,14 +6,14 @@
 
 import "./styles.css";
 
-import { get as getFromDataStore, set as setToDataStore } from "@api/DataStore";
+import { get as getFromDataStore } from "@api/DataStore";
 import { definePluginSettings } from "@api/Settings";
 import { classNameFactory } from "@api/Styles";
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType } from "@utils/types";
 import { Button, Forms, React, showToast, TextInput } from "@webpack/common";
 
-import { getAudioDataURI, saveAudio } from "./audioStore";
+import { getAudioDataURI, migrateBase64ToArrayBuffer } from "./audioStore";
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
 import { makeEmptyOverride, seasonalSounds, SoundOverride, soundTypes } from "./types";
 
@@ -88,10 +88,6 @@ export async function cleanupOldBase64Data(): Promise<number> {
 
         if (override.base64Data) {
             try {
-                const base64Part = override.base64Data.startsWith("data:")
-                    ? override.base64Data.split(",")[1]
-                    : override.base64Data;
-
                 let fileType = "audio/mpeg";
                 if (override.base64Data.startsWith("data:")) {
                     const typeMatch = override.base64Data.match(/data:([^;]+)/);
@@ -100,16 +96,14 @@ export async function cleanupOldBase64Data(): Promise<number> {
                     }
                 }
 
-                const binary = atob(base64Part);
-                const bytes = new Uint8Array(binary.length);
-                for (let i = 0; i < binary.length; i++) {
-                    bytes[i] = binary.charCodeAt(i);
-                }
-                const blob = new Blob([bytes], { type: fileType });
-
                 const fileName = `migrated_${soundId}`;
-                const file = new File([blob], fileName, { type: fileType });
-                const fileId = await saveAudio(file);
+
+                const fileId = await migrateBase64ToArrayBuffer(
+                    crypto.randomUUID(),
+                    override.base64Data,
+                    fileName,
+                    fileType
+                );
 
                 override.selectedFileId = fileId;
                 override.selectedSound = "custom";
@@ -147,20 +141,16 @@ export async function cleanupOldDataURIs(): Promise<number> {
             (!override.selectedFileId || override.selectedSound !== "custom")) {
 
             try {
-                const base64Part = override.url.split(",")[1];
                 const typeMatch = override.url.match(/data:([^;]+)/);
                 const fileType = typeMatch ? typeMatch[1] : "audio/mpeg";
-
-                const binary = atob(base64Part);
-                const bytes = new Uint8Array(binary.length);
-                for (let i = 0; i < binary.length; i++) {
-                    bytes[i] = binary.charCodeAt(i);
-                }
-                const blob = new Blob([bytes], { type: fileType });
-
                 const fileName = `recovered_${soundId}`;
-                const file = new File([blob], fileName, { type: fileType });
-                const fileId = await saveAudio(file);
+
+                const fileId = await migrateBase64ToArrayBuffer(
+                    crypto.randomUUID(),
+                    override.url,
+                    fileName,
+                    fileType
+                );
 
                 override.selectedFileId = fileId;
                 override.selectedSound = "custom";
@@ -225,14 +215,13 @@ const settings = definePluginSettings({
                             const imported = JSON.parse(e.target?.result as string);
 
                             if (imported.__files && typeof imported.__files === "object") {
-                                const store = await getFromDataStore(AUDIO_STORE_KEY) ?? {};
-
                                 for (const [fileId, fileData] of Object.entries(imported.__files)) {
                                     if (!fileData) continue;
 
                                     try {
                                         let base64: string;
                                         let fileName: string;
+                                        let fileType: string = "audio/mpeg";
 
                                         if (typeof fileData === "string") {
                                             base64 = fileData;
@@ -240,23 +229,17 @@ const settings = definePluginSettings({
                                         } else if (typeof fileData === "object" && "data" in fileData && "name" in fileData) {
                                             base64 = fileData.data as string;
                                             fileName = fileData.name as string;
+                                            fileType = (fileData as any).type || fileType;
                                         } else {
                                             console.error(`[CustomSounds] Invalid file data format for ${fileId}`);
                                             continue;
                                         }
 
-                                        store[fileId] = {
-                                            id: fileId,
-                                            name: fileName,
-                                            base64,
-                                            type: "audio/mpeg"
-                                        };
+                                        await migrateBase64ToArrayBuffer(fileId, base64, fileName, fileType);
                                     } catch (error) {
                                         console.error(`[CustomSounds] Failed to import file ${fileId}:`, error);
                                     }
                                 }
-
-                                await setToDataStore(AUDIO_STORE_KEY, store);
                             }
 
                             if (imported.overrides && Array.isArray(imported.overrides)) {
@@ -307,21 +290,38 @@ const settings = definePluginSettings({
                     }));
 
                 const usedFileIds = new Set(overrides.map(o => o.selectedFileId).filter(Boolean));
-                const fileBlobs: Record<string, { data: string; name: string; }> = {};
+                const fileBlobs: Record<string, { data: string; name: string; type: string; }> = {};
                 const store = await getFromDataStore(AUDIO_STORE_KEY) ?? {};
 
                 for (const fileId of usedFileIds) {
                     const entry = store[fileId as string];
 
-                    if (!entry || !entry.base64) {
-                        console.warn(`[CustomSounds] No base64 data for file ${fileId}`);
+                    if (!entry || !entry.buffer) {
+                        console.warn(`[CustomSounds] No data for file ${fileId}`);
                         continue;
                     }
 
-                    fileBlobs[fileId as string] = {
-                        data: entry.base64,
-                        name: entry.name || `unknown_${fileId}`
-                    };
+                    try {
+                        // Convert ArrayBuffer to base64 for export
+                        const uint8Array = new Uint8Array(entry.buffer);
+                        let binary = "";
+                        const chunkSize = 8192;
+
+                        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+                            const chunk = uint8Array.slice(i, i + chunkSize);
+                            binary += String.fromCharCode(...chunk);
+                        }
+
+                        const base64 = btoa(binary);
+
+                        fileBlobs[fileId as string] = {
+                            data: base64,
+                            name: entry.name || `unknown_${fileId}`,
+                            type: entry.type || "audio/mpeg"
+                        };
+                    } catch (error) {
+                        console.error(`[CustomSounds] Failed to export file ${fileId}:`, error);
+                    }
                 }
 
                 const exportPayload = {
