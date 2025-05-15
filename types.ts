@@ -13,7 +13,6 @@ export interface SoundType {
 export interface SoundOverride {
     enabled: boolean;
     selectedSound: string;
-    url: string;
     volume: number;
     useFile: boolean;
     selectedFileId?: string;
@@ -120,7 +119,6 @@ export function makeEmptyOverride(): SoundOverride {
     return {
         enabled: false,
         selectedSound: "default",
-        url: "",
         volume: 100,
         useFile: false,
         selectedFileId: undefined

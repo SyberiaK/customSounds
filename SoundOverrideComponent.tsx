@@ -13,7 +13,7 @@ import { Button, Card, Forms, React, Select, showToast, Slider, Switch } from "@
 import { ComponentType, Ref, SyntheticEvent } from "react";
 
 import { deleteAudio, getAllAudio, saveAudio, StoredAudioFile } from "./audioStore";
-import { refreshDataURI } from "./index";
+import { ensureDataURICached } from "./index";
 import { SoundOverride, SoundPlayer, SoundType } from "./types";
 
 type FileInput = ComponentType<{
@@ -55,26 +55,16 @@ export function SoundOverrideComponent({ type, override, onChange }: {
 
         const { selectedSound } = override;
 
-        if (selectedSound === "custom") {
-            if (!override.url || !override.url.startsWith("data:audio/")) {
-                if (override.selectedFileId) {
-                    try {
-                        await refreshDataURI(type.id);
-                    } catch (error) {
-                        console.error("[CustomSounds] Failed to refresh data URI for preview:", error);
-                        showToast("Error loading custom sound for preview");
-                        return;
-                    }
-                }
+        if (selectedSound === "custom" && override.selectedFileId) {
+            try {
+                const dataUri = await ensureDataURICached(override.selectedFileId);
 
-                if (!override.url || !override.url.startsWith("data:audio/")) {
+                if (!dataUri || !dataUri.startsWith("data:audio/")) {
                     showToast("No custom sound file available for preview");
                     return;
                 }
-            }
 
-            try {
-                const audio = new Audio(override.url);
+                const audio = new Audio(dataUri);
                 audio.volume = override.volume / 100;
 
                 audio.onerror = e => {
@@ -94,7 +84,7 @@ export function SoundOverrideComponent({ type, override, onChange }: {
                 };
             } catch (error) {
                 console.error("[CustomSounds] Error in previewSound:", error);
-                showToast("Error playing custom sound.");
+                showToast("Error playing sound.");
             }
         } else if (selectedSound === "default") {
             sound.current = playSound(type.id);
@@ -124,7 +114,7 @@ export function SoundOverrideComponent({ type, override, onChange }: {
             override.selectedFileId = id;
             override.selectedSound = "custom";
 
-            await refreshDataURI(type.id);
+            await ensureDataURICached(id);
 
             await onChange();
             update();
@@ -146,7 +136,6 @@ export function SoundOverrideComponent({ type, override, onChange }: {
 
             if (override.selectedFileId === id) {
                 override.selectedFileId = undefined;
-                override.url = "";
                 override.selectedSound = "default";
                 await onChange();
             }
@@ -174,9 +163,9 @@ export function SoundOverrideComponent({ type, override, onChange }: {
 
                     if (val && override.selectedSound === "custom" && override.selectedFileId) {
                         try {
-                            await refreshDataURI(type.id);
+                            await ensureDataURICached(override.selectedFileId);
                         } catch (error) {
-                            console.error(`[CustomSounds] Failed to refresh data URI for ${type.id}:`, error);
+                            console.error(`[CustomSounds] Failed to cache data URI for ${type.id}:`, error);
                             showToast("Error loading custom sound file");
                         }
                     }
@@ -233,13 +222,11 @@ export function SoundOverrideComponent({ type, override, onChange }: {
 
                             if (v === "custom" && override.selectedFileId) {
                                 try {
-                                    await refreshDataURI(type.id);
+                                    await ensureDataURICached(override.selectedFileId);
                                 } catch (error) {
-                                    console.error(`[CustomSounds] Failed to refresh data URI for ${type.id}:`, error);
+                                    console.error(`[CustomSounds] Failed to cache data URI for ${type.id}:`, error);
                                     showToast("Error loading custom sound file");
                                 }
-                            } else if (v !== "custom") {
-                                override.url = "";
                             }
 
                             await onChange();
@@ -261,10 +248,9 @@ export function SoundOverrideComponent({ type, override, onChange }: {
                                 select={async id => {
                                     if (!id) {
                                         override.selectedFileId = undefined;
-                                        override.url = "";
                                     } else {
                                         override.selectedFileId = id;
-                                        await refreshDataURI(type.id);
+                                        await ensureDataURICached(id);
                                     }
 
                                     await onChange();
