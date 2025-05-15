@@ -1,6 +1,6 @@
 /*
  * Vencord, a Discord client mod
- * Copyright (c) 2024 Vendicated and contributors
+ * Copyright (c) 2025 Vendicated and contributors
  * SPDX-License-Identifier: GPL-3.0-or-later
  */
 
@@ -14,10 +14,9 @@ export interface SoundOverride {
     enabled: boolean;
     selectedSound: string;
     url: string;
-    base64Data?: string; // Keep for migration from old versions
     volume: number;
     useFile: boolean;
-    selectedFileId?: string | null;
+    selectedFileId?: string;
 }
 
 export interface SoundPlayer {
@@ -124,6 +123,6 @@ export function makeEmptyOverride(): SoundOverride {
         url: "",
         volume: 100,
         useFile: false,
-        selectedFileId: null
+        selectedFileId: undefined
     };
 }

@@ -39,49 +39,36 @@ export async function getAudioDataURI(id: string): Promise<string | undefined> {
     const entry = all[id];
     if (!entry) return undefined;
 
-    const uint8Array = new Uint8Array(entry.buffer);
-    let binary = "";
-    const chunkSize = 8192;
+    try {
+        const uint8Array = new Uint8Array(entry.buffer);
 
-    for (let i = 0; i < uint8Array.length; i += chunkSize) {
-        const chunk = uint8Array.slice(i, i + chunkSize);
-        binary += String.fromCharCode(...chunk);
+        const blob = new Blob([uint8Array], { type: entry.type });
+
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    } catch (error) {
+        console.error("[CustomSounds] Error converting buffer to data URI:", error);
+
+        const uint8Array = new Uint8Array(entry.buffer);
+        let binary = "";
+        const chunkSize = 8192;
+
+        for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.slice(i, i + chunkSize);
+            binary += String.fromCharCode(...chunk);
+        }
+
+        const base64 = btoa(binary);
+        return `data:${entry.type};base64,${base64}`;
     }
-
-    const base64 = btoa(binary);
-    return `data:${entry.type};base64,${base64}`;
 }
 
 export async function deleteAudio(id: string): Promise<void> {
     const all = await getAllAudio();
     delete all[id];
     await set(STORAGE_KEY, all);
-}
-
-export async function migrateBase64ToArrayBuffer(id: string, base64Data: string, fileName: string, fileType: string): Promise<string> {
-    try {
-        const base64Part = base64Data.startsWith("data:") ? base64Data.split(",")[1] : base64Data;
-
-        const binary = atob(base64Part);
-        const buffer = new ArrayBuffer(binary.length);
-        const uint8Array = new Uint8Array(buffer);
-
-        for (let i = 0; i < binary.length; i++) {
-            uint8Array[i] = binary.charCodeAt(i);
-        }
-
-        const current = (await get(STORAGE_KEY)) ?? {};
-        current[id] = {
-            id,
-            name: fileName,
-            buffer,
-            type: fileType
-        };
-        await set(STORAGE_KEY, current);
-
-        return id;
-    } catch (error) {
-        console.error("[CustomSounds] Failed to migrate base64 data:", error);
-        throw error;
-    }
 }

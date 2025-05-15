@@ -90,11 +90,19 @@ export function SoundOverrideComponent({ type, override, onChange }: {
         const file = event.target.files?.[0];
         if (!file) return;
 
+        const fileExtension = file.name.split(".").pop()?.toLowerCase();
+        if (!fileExtension || !AUDIO_EXTENSIONS.includes(fileExtension)) {
+            showToast("Invalid file type. Please upload an audio file.");
+            event.target.value = "";
+            return;
+        }
+
         try {
+            showToast("Uploading file...");
             const id = await saveAudio(file);
 
-            const updated = await getAllAudio();
-            setFiles(updated);
+            const savedFiles = await getAllAudio();
+            setFiles(savedFiles);
 
             override.selectedFileId = id;
             override.selectedSound = "custom";
@@ -107,8 +115,10 @@ export function SoundOverrideComponent({ type, override, onChange }: {
             showToast(`File uploaded successfully: ${file.name}`);
         } catch (error) {
             console.error("[CustomSounds] Error uploading file:", error);
-            showToast("Error uploading file.");
+            showToast(`Error uploading file: ${error}`);
         }
+
+        event.target.value = "";
     };
 
     const deleteFile = async (id: string) => {
@@ -120,9 +130,11 @@ export function SoundOverrideComponent({ type, override, onChange }: {
             if (override.selectedFileId === id) {
                 override.selectedFileId = undefined;
                 override.url = "";
+                override.selectedSound = "default";
                 await onChange();
             }
             update();
+            showToast("File deleted successfully");
         } catch (error) {
             console.error("[CustomSounds] Error deleting file:", error);
             showToast("Error deleting file.");
@@ -224,15 +236,18 @@ export function SoundOverrideComponent({ type, override, onChange }: {
                         <>
                             <Forms.FormTitle>Custom File</Forms.FormTitle>
                             <Select
-                                options={customFileOptions}
-                                isSelected={v => v === override.selectedFileId}
+                                options={[
+                                    { value: "", label: "Select a file..." },
+                                    ...customFileOptions
+                                ]}
+                                isSelected={v => v === (override.selectedFileId || "")}
                                 select={async id => {
-                                    override.selectedFileId = id;
-
-                                    if (id) {
-                                        await refreshDataURI(type.id);
-                                    } else {
+                                    if (!id) {
+                                        override.selectedFileId = undefined;
                                         override.url = "";
+                                    } else {
+                                        override.selectedFileId = id;
+                                        await refreshDataURI(type.id);
                                     }
 
                                     await onChange();
@@ -244,7 +259,7 @@ export function SoundOverrideComponent({ type, override, onChange }: {
                             <input
                                 ref={fileInputRef}
                                 type="file"
-                                accept=".mp3,.wav,.ogg,.m4a,.flac"
+                                accept=".mp3,.wav,.ogg,.m4a,.flac,.aac,.webm,.wma,.mp4"
                                 style={{ display: "none" }}
                                 onChange={uploadFile}
                             />

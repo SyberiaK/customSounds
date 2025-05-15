@@ -1,4 +1,4 @@
-**New and improved UI. Added ability to save/upload multiple custom sounds. Optimized for better compatability.**
+**UPDATE: New and improved UI. Added ability to save/upload multiple custom sounds.**
 > [!TIP]
 > **If you run into any issues, please let me know on [Discord](https://discord.gg/jHDJaW9Gyz)**
 # Custom Sounds (Vencord)
