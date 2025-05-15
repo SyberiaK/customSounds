@@ -33,7 +33,14 @@ export function getCustomSoundURL(id: string): string | null {
     }
 
     if (override.selectedSound === "custom" && override.selectedFileId) {
-        return dataUriCache.get(override.selectedFileId) || null;
+        const dataUri = dataUriCache.get(override.selectedFileId);
+        if (dataUri) {
+            console.log(`[CustomSounds] Returning cached data URI for ${id}`);
+            return dataUri;
+        } else {
+            console.warn(`[CustomSounds] No cached data URI for ${id} with file ID ${override.selectedFileId}`);
+            return null;
+        }
     }
 
     if (override.selectedSound !== "default" && override.selectedSound !== "custom") {
@@ -64,6 +71,7 @@ export async function ensureDataURICached(fileId: string): Promise<string | null
         const dataUri = await getAudioDataURI(fileId);
         if (dataUri) {
             dataUriCache.set(fileId, dataUri);
+            console.log(`[CustomSounds] Cached data URI for file ${fileId}`);
             return dataUri;
         }
     } catch (error) {
@@ -168,7 +176,20 @@ export async function debugCustomSounds() {
     console.log("[CustomSounds] === END DEBUG ===");
 }
 
+const soundSettings = Object.fromEntries(
+    allSoundTypes.map(type => [
+        type.id,
+        {
+            type: OptionType.STRING,
+            description: `Override for ${type.name}`,
+            default: JSON.stringify(makeEmptyOverride()),
+            hidden: true
+        }
+    ])
+);
+
 const settings = definePluginSettings({
+    ...soundSettings,
     overrides: {
         type: OptionType.COMPONENT,
         description: "",
@@ -177,12 +198,21 @@ const settings = definePluginSettings({
             const [searchQuery, setSearchQuery] = React.useState("");
             const fileInputRef = React.useRef<HTMLInputElement>(null);
 
+            React.useEffect(() => {
+                allSoundTypes.forEach(type => {
+                    if (!settings.store[type.id]) {
+                        settings.store[type.id] = makeEmptyOverride();
+                    }
+                });
+            }, []);
+
             const resetOverrides = () => {
                 allSoundTypes.forEach(type => {
                     settings.store[type.id] = makeEmptyOverride();
                 });
                 dataUriCache.clear();
                 setResetTrigger(prev => prev + 1);
+                showToast("All overrides reset successfully!");
             };
 
             const triggerFileUpload = () => {
@@ -262,6 +292,7 @@ const settings = definePluginSettings({
                     <div className="vc-custom-sounds-buttons">
                         <Button color={Button.Colors.BRAND} onClick={triggerFileUpload}>Import</Button>
                         <Button color={Button.Colors.PRIMARY} onClick={downloadSettings}>Export</Button>
+                        <Button color={Button.Colors.RED} onClick={resetOverrides}>Reset All</Button>
                         <Button color={Button.Colors.WHITE} onClick={debugCustomSounds}>Debug</Button>
                         <input
                             ref={fileInputRef}
@@ -288,6 +319,21 @@ const settings = definePluginSettings({
                                 type={type}
                                 override={settings.store[type.id] ?? makeEmptyOverride()}
                                 onChange={async () => {
+                                    if (!settings.store[type.id]) {
+                                        settings.store[type.id] = makeEmptyOverride();
+                                    }
+
+                                    const override = settings.store[type.id];
+                                    if (override.enabled && override.selectedSound === "custom" && override.selectedFileId) {
+                                        try {
+                                            await ensureDataURICached(override.selectedFileId);
+                                        } catch (error) {
+                                            console.error(`[CustomSounds] Failed to cache data URI for ${type.id}:`, error);
+                                            showToast("Error loading custom sound file");
+                                        }
+                                    }
+
+                                    console.log(`[CustomSounds] Settings saved for ${type.id}:`, settings.store[type.id]);
                                 }}
                             />
                         ))}
@@ -348,7 +394,6 @@ export default definePlugin({
 
         try {
             await preloadDataURIs();
-
             console.log("[CustomSounds] Startup complete");
         } catch (error) {
             console.error("[CustomSounds] Startup failed:", error);

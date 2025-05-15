@@ -45,6 +45,11 @@ export function SoundOverrideComponent({ type, override, onChange }: {
         getAllAudio().then(setFiles);
     }, []);
 
+    const saveAndNotify = async () => {
+        await onChange();
+        update();
+    };
+
     const previewSound = async () => {
         sound.current?.stop();
 
@@ -115,9 +120,7 @@ export function SoundOverrideComponent({ type, override, onChange }: {
             override.selectedSound = "custom";
 
             await ensureDataURICached(id);
-
-            await onChange();
-            update();
+            await saveAndNotify();
 
             showToast(`File uploaded successfully: ${file.name}`);
         } catch (error) {
@@ -137,9 +140,10 @@ export function SoundOverrideComponent({ type, override, onChange }: {
             if (override.selectedFileId === id) {
                 override.selectedFileId = undefined;
                 override.selectedSound = "default";
-                await onChange();
+                await saveAndNotify();
+            } else {
+                update();
             }
-            update();
             showToast("File deleted successfully");
         } catch (error) {
             console.error("[CustomSounds] Error deleting file:", error);
@@ -157,8 +161,9 @@ export function SoundOverrideComponent({ type, override, onChange }: {
     return (
         <Card className={cl("card")}>
             <Switch
-                value={override.enabled}
+                value={override.enabled || false}
                 onChange={async val => {
+                    console.log(`[CustomSounds] Setting ${type.id} enabled to:`, val);
                     override.enabled = val;
 
                     if (val && override.selectedSound === "custom" && override.selectedFileId) {
@@ -170,8 +175,8 @@ export function SoundOverrideComponent({ type, override, onChange }: {
                         }
                     }
 
-                    await onChange();
-                    update();
+                    await saveAndNotify();
+                    console.log("[CustomSounds] After setting enabled, override.enabled =", override.enabled);
                 }}
                 className={Margins.bottom16}
                 hideBorder
@@ -202,8 +207,7 @@ export function SoundOverrideComponent({ type, override, onChange }: {
                         initialValue={override.volume}
                         onValueChange={val => {
                             override.volume = val;
-                            onChange();
-                            update();
+                            saveAndNotify();
                         }}
                         className={Margins.bottom16}
                         disabled={!override.enabled}
@@ -229,8 +233,7 @@ export function SoundOverrideComponent({ type, override, onChange }: {
                                 }
                             }
 
-                            await onChange();
-                            update();
+                            await saveAndNotify();
                         }}
                         serialize={opt => opt.value}
                         className={Margins.bottom16}
@@ -253,8 +256,7 @@ export function SoundOverrideComponent({ type, override, onChange }: {
                                         await ensureDataURICached(id);
                                     }
 
-                                    await onChange();
-                                    update();
+                                    await saveAndNotify();
                                 }}
                                 serialize={opt => opt.value}
                                 className={Margins.bottom8}
