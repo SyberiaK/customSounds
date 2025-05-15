@@ -42,7 +42,44 @@ export async function getAudioDataURI(id: string): Promise<string | undefined> {
     try {
         const uint8Array = new Uint8Array(entry.buffer);
 
-        const blob = new Blob([uint8Array], { type: entry.type });
+        let mimeType = entry.type || "audio/mpeg";
+
+        if (!mimeType || mimeType === "application/octet-stream") {
+            if (entry.name) {
+                const extension = entry.name.split(".").pop()?.toLowerCase();
+                switch (extension) {
+                    case "ogg":
+                        mimeType = "audio/ogg";
+                        break;
+                    case "mp3":
+                        mimeType = "audio/mpeg";
+                        break;
+                    case "wav":
+                        mimeType = "audio/wav";
+                        break;
+                    case "m4a":
+                    case "mp4":
+                        mimeType = "audio/mp4";
+                        break;
+                    case "flac":
+                        mimeType = "audio/flac";
+                        break;
+                    case "aac":
+                        mimeType = "audio/aac";
+                        break;
+                    case "webm":
+                        mimeType = "audio/webm";
+                        break;
+                    case "wma":
+                        mimeType = "audio/x-ms-wma";
+                        break;
+                    default:
+                        mimeType = "audio/mpeg"; // Default fallback
+                }
+            }
+        }
+
+        const blob = new Blob([uint8Array], { type: mimeType });
 
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
@@ -62,8 +99,27 @@ export async function getAudioDataURI(id: string): Promise<string | undefined> {
             binary += String.fromCharCode(...chunk);
         }
 
+        let mimeType = entry.type || "audio/mpeg";
+        if (!mimeType || mimeType === "application/octet-stream") {
+            if (entry.name) {
+                const extension = entry.name.split(".").pop()?.toLowerCase();
+                switch (extension) {
+                    case "ogg": mimeType = "audio/ogg"; break;
+                    case "mp3": mimeType = "audio/mpeg"; break;
+                    case "wav": mimeType = "audio/wav"; break;
+                    case "m4a":
+                    case "mp4": mimeType = "audio/mp4"; break;
+                    case "flac": mimeType = "audio/flac"; break;
+                    case "aac": mimeType = "audio/aac"; break;
+                    case "webm": mimeType = "audio/webm"; break;
+                    case "wma": mimeType = "audio/x-ms-wma"; break;
+                    default: mimeType = "audio/mpeg";
+                }
+            }
+        }
+
         const base64 = btoa(binary);
-        return `data:${entry.type};base64,${base64}`;
+        return `data:${mimeType};base64,${base64}`;
     }
 }
 

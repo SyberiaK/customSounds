@@ -55,7 +55,24 @@ export function SoundOverrideComponent({ type, override, onChange }: {
 
         const { selectedSound } = override;
 
-        if (selectedSound === "custom" && override.url && override.url.startsWith("data:audio/")) {
+        if (selectedSound === "custom") {
+            if (!override.url || !override.url.startsWith("data:audio/")) {
+                if (override.selectedFileId) {
+                    try {
+                        await refreshDataURI(type.id);
+                    } catch (error) {
+                        console.error("[CustomSounds] Failed to refresh data URI for preview:", error);
+                        showToast("Error loading custom sound for preview");
+                        return;
+                    }
+                }
+
+                if (!override.url || !override.url.startsWith("data:audio/")) {
+                    showToast("No custom sound file available for preview");
+                    return;
+                }
+            }
+
             try {
                 const audio = new Audio(override.url);
                 audio.volume = override.volume / 100;
@@ -77,7 +94,7 @@ export function SoundOverrideComponent({ type, override, onChange }: {
                 };
             } catch (error) {
                 console.error("[CustomSounds] Error in previewSound:", error);
-                showToast("Error playing sound.");
+                showToast("Error playing custom sound.");
             }
         } else if (selectedSound === "default") {
             sound.current = playSound(type.id);
