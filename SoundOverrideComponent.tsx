@@ -9,7 +9,8 @@ import { Margins } from "@utils/margins";
 import { useForceUpdater } from "@utils/react";
 import { makeRange } from "@utils/types";
 import { findByCodeLazy, findLazy } from "@webpack";
-import { Button, Card, Forms, React, Select, showToast, Slider, Switch } from "@webpack/common";
+import { Button, Forms, React, Select, showToast, Slider, Switch } from "@webpack/common";
+import { Card } from "@components/Card";
 import { ComponentType, Ref, SyntheticEvent } from "react";
 
 import { deleteAudio, getAllAudio, saveAudio, StoredAudioFile } from "./audioStore";
