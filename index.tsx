@@ -6,14 +6,13 @@
 
 import "./styles.css";
 
-import { get as getFromDataStore } from "@api/DataStore";
 import { definePluginSettings } from "@api/Settings";
 import { classNameFactory } from "@api/Styles";
 import { Devs } from "@utils/constants";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
 import { Button, Forms, React, showToast, TextInput } from "@webpack/common";
 
-import { getAllAudio, getAudioDataURI } from "./audioStore";
+import { AudioFileMetadata, getAllAudioMetadata, getAudioDataURI, getMaxFileSizeMB, getStorageInfo, migrateStorage, setMaxFileSizeMB } from "./audioStore";
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
 import { makeEmptyOverride, seasonalSounds, SoundOverride, soundTypes } from "./types";
 
@@ -21,9 +20,58 @@ const cl = classNameFactory("vc-custom-sounds-");
 
 const allSoundTypes = soundTypes || [];
 
-const AUDIO_STORE_KEY = "ScattrdCustomSounds";
-
+// LRU-style cache with dynamic size limit based on max file size setting
+// Cache size = max file size * 5 (allows caching several files)
+// Base64 encoding adds ~37% overhead, so we account for that
+const BASE64_OVERHEAD = 1.37;
+let maxCacheSizeBytes = 100 * 1024 * 1024; // Default 100MB, updated on start
 const dataUriCache = new Map<string, string>();
+let currentCacheSize = 0;
+
+function updateCacheLimit(maxFileSizeMB: number): void {
+    // Cache can hold ~5 files at max size (accounting for base64 overhead)
+    // Minimum 50MB, maximum 500MB to prevent extreme memory usage
+    const calculatedSize = Math.round(maxFileSizeMB * BASE64_OVERHEAD * 5);
+    maxCacheSizeBytes = Math.min(Math.max(calculatedSize, 50), 500) * 1024 * 1024;
+}
+
+function addToCache(fileId: string, dataUri: string): void {
+    const uriSize = dataUri.length;
+
+    // If this single item is larger than the max cache, don't cache it
+    if (uriSize > maxCacheSizeBytes) {
+        console.warn(`[CustomSounds] File too large to cache (${Math.round(uriSize / (1024 * 1024))}MB > ${Math.round(maxCacheSizeBytes / (1024 * 1024))}MB limit)`);
+        return;
+    }
+
+    // Evict oldest entries if needed (Map maintains insertion order)
+    while (currentCacheSize + uriSize > maxCacheSizeBytes && dataUriCache.size > 0) {
+        const oldestKey = dataUriCache.keys().next().value;
+        if (oldestKey) {
+            const oldestSize = dataUriCache.get(oldestKey)?.length || 0;
+            dataUriCache.delete(oldestKey);
+            currentCacheSize -= oldestSize;
+        }
+    }
+
+    dataUriCache.set(fileId, dataUri);
+    currentCacheSize += uriSize;
+}
+
+function getFromCache(fileId: string): string | undefined {
+    const dataUri = dataUriCache.get(fileId);
+    if (dataUri) {
+        // Move to end (most recently used) by re-inserting
+        dataUriCache.delete(fileId);
+        dataUriCache.set(fileId, dataUri);
+    }
+    return dataUri;
+}
+
+function clearCache(): void {
+    dataUriCache.clear();
+    currentCacheSize = 0;
+}
 
 function getOverride(id: string): SoundOverride {
     const stored = settings.store[id];
@@ -50,14 +98,12 @@ export function getCustomSoundURL(id: string): string | null {
     }
 
     if (override.selectedSound === "custom" && override.selectedFileId) {
-        const dataUri = dataUriCache.get(override.selectedFileId);
+        const dataUri = getFromCache(override.selectedFileId);
         if (dataUri) {
-            console.log(`[CustomSounds] Returning cached data URI for ${id}`);
             return dataUri;
-        } else {
-            console.warn(`[CustomSounds] No cached data URI for ${id} with file ID ${override.selectedFileId}`);
-            return null;
         }
+        // Cache miss - this shouldn't happen if preloading worked, but don't block
+        return null;
     }
 
     if (override.selectedSound !== "default" && override.selectedSound !== "custom") {
@@ -80,19 +126,19 @@ export function getCustomSoundURL(id: string): string | null {
 }
 
 export async function ensureDataURICached(fileId: string): Promise<string | null> {
-    if (dataUriCache.has(fileId)) {
-        return dataUriCache.get(fileId)!;
+    const cached = getFromCache(fileId);
+    if (cached) {
+        return cached;
     }
 
     try {
         const dataUri = await getAudioDataURI(fileId);
         if (dataUri) {
-            dataUriCache.set(fileId, dataUri);
-            console.log(`[CustomSounds] Cached data URI for file ${fileId}`);
+            addToCache(fileId, dataUri);
             return dataUri;
         }
     } catch (error) {
-        console.error(`[CustomSounds] Error generating data URI for ${fileId}:`, error);
+        console.error(`[CustomSounds] Error loading audio for ${fileId}:`, error);
     }
 
     return null;
@@ -101,96 +147,78 @@ export async function ensureDataURICached(fileId: string): Promise<string | null
 export async function refreshDataURI(id: string): Promise<void> {
     const override = getOverride(id);
     if (!override?.selectedFileId) {
-        console.log(`[CustomSounds] refreshDataURI called for ${id} but no selectedFileId`);
         return;
     }
 
-    console.log(`[CustomSounds] Refreshing data URI for ${id} with file ID ${override.selectedFileId}`);
-
-    const dataUri = await ensureDataURICached(override.selectedFileId);
-    if (dataUri) {
-        console.log(`[CustomSounds] Successfully cached data URI for ${id} (length: ${dataUri.length})`);
-    } else {
-        console.error(`[CustomSounds] Failed to cache data URI for ${id}`);
-    }
+    await ensureDataURICached(override.selectedFileId);
 }
 
 async function preloadDataURIs() {
-    console.log("[CustomSounds] Preloading data URIs into memory cache...");
+    // Collect unique file IDs that need preloading
+    const fileIdsToPreload = new Set<string>();
 
     for (const soundType of allSoundTypes) {
         const override = getOverride(soundType.id);
         if (override?.enabled && override.selectedSound === "custom" && override.selectedFileId) {
-            try {
-                await ensureDataURICached(override.selectedFileId);
-                console.log(`[CustomSounds] Preloaded data URI for ${soundType.id}`);
-            } catch (error) {
-                console.error(`[CustomSounds] Failed to preload data URI for ${soundType.id}:`, error);
-            }
+            fileIdsToPreload.add(override.selectedFileId);
         }
     }
 
-    console.log(`[CustomSounds] Memory cache contains ${dataUriCache.size} data URIs`);
+    if (fileIdsToPreload.size === 0) {
+        return;
+    }
+
+    // Preload each unique file (avoids duplicate loads if same file used for multiple sounds)
+    let loaded = 0;
+    for (const fileId of fileIdsToPreload) {
+        try {
+            await ensureDataURICached(fileId);
+            loaded++;
+        } catch (error) {
+            console.error(`[CustomSounds] Failed to preload file ${fileId}:`, error);
+        }
+    }
+
+    console.log(`[CustomSounds] Preloaded ${loaded}/${fileIdsToPreload.size} custom sounds`);
 }
 
 export async function debugCustomSounds() {
     console.log("[CustomSounds] === DEBUG INFO ===");
 
-    const rawDataStore = await getFromDataStore(AUDIO_STORE_KEY);
-    console.log("[CustomSounds] Raw DataStore content:", rawDataStore);
+    // Settings info
+    console.log(`[CustomSounds] Max file size: ${getMaxFileSizeMB()}MB`);
+    console.log(`[CustomSounds] Max cache size: ${Math.round(maxCacheSizeBytes / (1024 * 1024))}MB`);
 
-    const allFiles = await getAllAudio();
-    console.log(`[CustomSounds] Stored files: ${Object.keys(allFiles).length}`);
+    // Storage info
+    const storageInfo = await getStorageInfo();
+    console.log(`[CustomSounds] Stored files: ${storageInfo.fileCount}, Total size: ${storageInfo.totalSizeKB}KB`);
 
-    let totalBufferSize = 0;
-    let totalDataUriSize = 0;
+    // Memory cache info
+    console.log(`[CustomSounds] Memory cache: ${dataUriCache.size} items, ${Math.round(currentCacheSize / 1024)}KB`);
 
-    for (const [id, file] of Object.entries(allFiles)) {
-        const bufferSize = file.buffer?.byteLength || 0;
-        const dataUriSize = file.dataUri?.length || 0;
-        totalBufferSize += bufferSize;
-        totalDataUriSize += dataUriSize;
-
-        console.log(`[CustomSounds] File ${id}:`, {
-            name: file.name,
-            type: file.type,
-            bufferSize: `${(bufferSize / 1024).toFixed(1)}KB`,
-            hasValidBuffer: file.buffer instanceof ArrayBuffer,
-            hasDataUri: !!file.dataUri,
-            dataUriSize: `${(dataUriSize / 1024).toFixed(1)}KB`
-        });
-    }
-
-    console.log(`[CustomSounds] Total storage - Buffers: ${(totalBufferSize / 1024).toFixed(1)}KB, DataURIs: ${(totalDataUriSize / 1024).toFixed(1)}KB`);
-
-    console.log(`[CustomSounds] Memory cache contains ${dataUriCache.size} data URIs`);
-
-    console.log("[CustomSounds] Settings store structure:", Object.keys(settings.store));
-
-    console.log("[CustomSounds] Sound override status:");
+    // Count enabled overrides
     let enabledCount = 0;
-    let totalSettingsSize = 0;
+    let customSoundCount = 0;
 
-    for (const [soundId, storedValue] of Object.entries(settings.store)) {
-        if (soundId === "overrides") continue;
-
-        const override = getOverride(soundId);
-        const settingsSize = JSON.stringify(override).length;
-        totalSettingsSize += settingsSize;
-
-        console.log(`[CustomSounds] ${soundId}:`, {
-            enabled: override.enabled,
-            selectedSound: override.selectedSound,
-            selectedFileId: override.selectedFileId,
-            volume: override.volume,
-            settingsSize: `${settingsSize}B`
-        });
-
-        if (override.enabled) enabledCount++;
+    for (const soundType of allSoundTypes) {
+        const override = getOverride(soundType.id);
+        if (override.enabled) {
+            enabledCount++;
+            if (override.selectedSound === "custom") {
+                customSoundCount++;
+            }
+        }
     }
 
-    console.log(`[CustomSounds] Total enabled overrides: ${enabledCount}`);
-    console.log(`[CustomSounds] Estimated settings size: ${(totalSettingsSize / 1024).toFixed(1)}KB`);
+    console.log(`[CustomSounds] Enabled overrides: ${enabledCount} (${customSoundCount} custom)`);
+
+    // List all files
+    const metadata = await getAllAudioMetadata();
+    console.log("[CustomSounds] Audio files:");
+    for (const [id, file] of Object.entries(metadata)) {
+        console.log(`  - ${file.name} (${Math.round(file.size / 1024)}KB) [${id}]`);
+    }
+
     console.log("[CustomSounds] === END DEBUG ===");
 }
 
@@ -206,15 +234,47 @@ const soundSettings = Object.fromEntries(
     ])
 );
 
+// File size options (in MB)
+const fileSizeOptions = [
+    { value: 5, label: "5 MB (Conservative)" },
+    { value: 15, label: "15 MB (Default)" },
+    { value: 30, label: "30 MB (Large)" },
+    { value: 50, label: "50 MB (Very Large)" },
+    { value: 100, label: "100 MB (Extreme - Use with caution!)" },
+];
+
 const settings = definePluginSettings({
     ...soundSettings,
+    maxFileSize: {
+        type: OptionType.SELECT,
+        description: "Maximum file size for custom audio uploads. Larger sizes use more memory and may cause performance issues or crashes on lower-end devices. Increase at your own risk!",
+        options: fileSizeOptions,
+        default: 15,
+        onChange: (value: number) => {
+            setMaxFileSizeMB(value);
+            updateCacheLimit(value);
+        }
+    },
     overrides: {
         type: OptionType.COMPONENT,
         description: "",
         component: () => {
             const [resetTrigger, setResetTrigger] = React.useState(0);
             const [searchQuery, setSearchQuery] = React.useState("");
+            const [files, setFiles] = React.useState<Record<string, AudioFileMetadata>>({});
+            const [filesLoaded, setFilesLoaded] = React.useState(false);
             const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+            const loadFiles = React.useCallback(async () => {
+                try {
+                    const metadata = await getAllAudioMetadata();
+                    setFiles(metadata);
+                    setFilesLoaded(true);
+                } catch (error) {
+                    console.error("[CustomSounds] Error loading audio metadata:", error);
+                    setFilesLoaded(true);
+                }
+            }, []);
 
             React.useEffect(() => {
                 allSoundTypes.forEach(type => {
@@ -222,13 +282,14 @@ const settings = definePluginSettings({
                         setOverride(type.id, makeEmptyOverride());
                     }
                 });
+                loadFiles();
             }, []);
 
             const resetOverrides = () => {
                 allSoundTypes.forEach(type => {
                     setOverride(type.id, makeEmptyOverride());
                 });
-                dataUriCache.clear();
+                clearCache();
                 setResetTrigger(prev => prev + 1);
                 showToast("All overrides reset successfully!");
             };
@@ -332,34 +393,37 @@ const settings = definePluginSettings({
                         />
                     </div>
 
-                    <div className={cl("sounds-list")}>
-                        {filteredSoundTypes.map(type => {
-                            const currentOverride = getOverride(type.id);
+                    {!filesLoaded ? (
+                        <Forms.FormText>Loading audio files...</Forms.FormText>
+                    ) : (
+                        <div className={cl("sounds-list")}>
+                            {filteredSoundTypes.map(type => {
+                                const currentOverride = getOverride(type.id);
 
-                            return (
-                                <SoundOverrideComponent
-                                    key={`${type.id}-${resetTrigger}`}
-                                    type={type}
-                                    override={currentOverride}
-                                    onChange={async () => {
+                                return (
+                                    <SoundOverrideComponent
+                                        key={`${type.id}-${resetTrigger}`}
+                                        type={type}
+                                        override={currentOverride}
+                                        files={files}
+                                        onFilesChange={loadFiles}
+                                        onChange={async () => {
+                                            setOverride(type.id, currentOverride);
 
-                                        setOverride(type.id, currentOverride);
-
-                                        if (currentOverride.enabled && currentOverride.selectedSound === "custom" && currentOverride.selectedFileId) {
-                                            try {
-                                                await ensureDataURICached(currentOverride.selectedFileId);
-                                            } catch (error) {
-                                                console.error(`[CustomSounds] Failed to cache data URI for ${type.id}:`, error);
-                                                showToast("Error loading custom sound file");
+                                            if (currentOverride.enabled && currentOverride.selectedSound === "custom" && currentOverride.selectedFileId) {
+                                                try {
+                                                    await ensureDataURICached(currentOverride.selectedFileId);
+                                                } catch (error) {
+                                                    console.error("[CustomSounds] Failed to load custom sound:", error);
+                                                    showToast("Error loading custom sound file");
+                                                }
                                             }
-                                        }
-
-                                        console.log(`[CustomSounds] Settings saved for ${type.id}:`, currentOverride);
-                                    }}
-                                />
-                            );
-                        })}
-                    </div>
+                                        }}
+                                    />
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             );
         }
@@ -411,13 +475,19 @@ export default definePlugin({
     startAt: StartAt.Init,
 
     async start() {
-        console.log("[CustomSounds] Plugin starting...");
-
         try {
+            // Initialize max file size and cache limit from settings
+            const maxSize = settings.store.maxFileSize ?? 15;
+            setMaxFileSizeMB(maxSize);
+            updateCacheLimit(maxSize);
+
+            // Migrate old storage format if needed (removes redundant buffers)
+            await migrateStorage();
+
+            // Preload enabled custom sounds into memory
             await preloadDataURIs();
-            console.log("[CustomSounds] Startup complete");
         } catch (error) {
-            console.error("[CustomSounds] Startup failed:", error);
+            console.error("[CustomSounds] Startup error:", error);
         }
     }
 });
