@@ -67,12 +67,23 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                     return;
                 }
 
+                // Check if browser supports this format (e.g. WMA is not supported in Chrome/Firefox)
+                const mimeMatch = dataUri.match(/^data:(audio\/[^;,]+)/i);
+                const mimeType = mimeMatch ? mimeMatch[1] : "audio/mpeg";
+                const testEl = document.createElement("audio");
+                if (testEl.canPlayType(mimeType) === "") {
+                    showToast("Your browser doesn't support this format. Try re-uploading as MP3 or WAV.");
+                    return;
+                }
+
                 const audio = new Audio(dataUri);
                 audio.volume = override.volume / 100;
 
-                audio.onerror = e => {
-                    console.error("[CustomSounds] Error playing custom audio:", e);
-                    showToast("Error playing custom sound. File may be corrupted.");
+                audio.onerror = () => {
+                    const msg = audio.error?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
+                        ? "Format not supported by browser. Try MP3 or WAV."
+                        : "Could not play file. It may be corrupted or in an unsupported format.";
+                    showToast(msg);
                 };
 
                 await audio.play();
@@ -85,9 +96,14 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                     },
                     loop: () => { audio.loop = true; }
                 };
-            } catch (error) {
+            } catch (error: unknown) {
+                const err = error as Error & { name?: string; };
                 console.error("[CustomSounds] Error in previewSound:", error);
-                showToast("Error playing sound.");
+                if (err?.name === "NotSupportedError" || err?.message?.includes("supported source")) {
+                    showToast("Format not supported by your browser. Try re-uploading as MP3 or WAV.");
+                } else {
+                    showToast("Could not play sound. File may be corrupted or in an unsupported format.");
+                }
             }
         } else if (selectedSound === "default") {
             sound.current = playSound(type.id);
