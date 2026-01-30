@@ -16,6 +16,8 @@ import { AudioFileMetadata, getAllAudioMetadata, getAudioDataURI, getMaxFileSize
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
 import { makeEmptyOverride, seasonalSounds, SoundOverride, soundTypes } from "./types";
 
+const SEASONAL_IDS = new Set(Object.keys(seasonalSounds));
+
 const cl = classNameFactory("vc-custom-sounds-");
 
 const allSoundTypes = soundTypes || [];
@@ -153,6 +155,21 @@ export async function refreshDataURI(id: string): Promise<void> {
     await ensureDataURICached(override.selectedFileId);
 }
 
+function resetSeasonalOverridesToDefault(): void {
+    let count = 0;
+    for (const soundType of allSoundTypes) {
+        const override = getOverride(soundType.id);
+        if (override.enabled && SEASONAL_IDS.has(override.selectedSound)) {
+            override.selectedSound = "default";
+            setOverride(soundType.id, override);
+            count++;
+        }
+    }
+    if (count > 0) {
+        console.log(`[CustomSounds] Reset ${count} seasonal sound(s) to default`);
+    }
+}
+
 async function preloadDataURIs() {
     // Collect unique file IDs that need preloading
     const fileIdsToPreload = new Set<string>();
@@ -254,6 +271,11 @@ const settings = definePluginSettings({
             setMaxFileSizeMB(value);
             updateCacheLimit(value);
         }
+    },
+    resetSeasonalOnStartup: {
+        type: OptionType.BOOLEAN,
+        description: "Reset seasonal sounds to default on startup. Any sound set to a Halloween/Winter variant will be changed back to Default when the plugin loads.",
+        default: true
     },
     overrides: {
         type: OptionType.COMPONENT,
@@ -480,6 +502,11 @@ export default definePlugin({
             const maxSize = settings.store.maxFileSize ?? 15;
             setMaxFileSizeMB(maxSize);
             updateCacheLimit(maxSize);
+
+            // Optionally reset seasonal sounds to default on startup
+            if (settings.store.resetSeasonalOnStartup) {
+                resetSeasonalOverridesToDefault();
+            }
 
             // Migrate old storage format if needed (removes redundant buffers)
             await migrateStorage();
