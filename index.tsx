@@ -470,7 +470,7 @@ export default definePlugin({
             find: 'Error("could not play audio")',
             replacement: [
                 {
-                    match: /(?<=new Audio;\i\.src=)\i\([0-9]+\)\("\.\/"\.concat\(this\.name,"\.mp3"\)\)/,
+                    match: /(?<=new Audio;\i\.src=)\i\([0-9]+\)\(`\.\/\$\{this\.name\}\.mp3`\)/,
                     replace: "(() => { const customUrl = $self.getCustomSoundURL(this.name); return customUrl || $& })()"
                 },
                 {
