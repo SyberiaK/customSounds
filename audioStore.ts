@@ -133,6 +133,11 @@ export async function deleteAudio(id: string): Promise<void> {
     }
 }
 
+export async function clearStore(): Promise<void> {
+    await set(STORAGE_KEY, {});
+    await set(METADATA_KEY, {});
+}
+
 /**
  * Migrate old storage format to new format (run once on startup)
  */

@@ -7,16 +7,21 @@
 import "./styles.css";
 
 import { definePluginSettings } from "@api/Settings";
-import { classNameFactory } from "@api/Styles";
+import { Button } from "@components/Button";
+import { Heading } from "@components/Heading";
+import { Paragraph } from "@components/Paragraph";
 import { Devs } from "@utils/constants";
+import { classNameFactory } from "@utils/css";
+import { useForceUpdater } from "@utils/react";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
-import { Button, Forms, React, showToast, TextInput } from "@webpack/common";
+import { Alerts, React, showToast, TextInput } from "@webpack/common";
 
-import { AudioFileMetadata, getAllAudioMetadata, getAudioDataURI, getMaxFileSizeMB, getStorageInfo, migrateStorage, setMaxFileSizeMB } from "./audioStore";
+import { AudioFileMetadata, clearStore, getAllAudioMetadata, getAudioDataURI, getMaxFileSizeMB, getStorageInfo, migrateStorage, saveAudio, setMaxFileSizeMB } from "./audioStore";
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
 import { makeEmptyOverride, seasonalSounds, SoundOverride, soundTypes } from "./types";
 
 const SEASONAL_IDS = new Set(Object.keys(seasonalSounds));
+const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "m4a", "aac", "flac", "webm", "wma", "mp4"];
 
 const cl = classNameFactory("vc-custom-sounds-");
 
@@ -237,6 +242,8 @@ export async function debugCustomSounds() {
     }
 
     console.log("[CustomSounds] === END DEBUG ===");
+
+    showToast("Debug info printed in the console.");
 }
 
 const soundSettings = Object.fromEntries(
@@ -285,7 +292,9 @@ const settings = definePluginSettings({
             const [searchQuery, setSearchQuery] = React.useState("");
             const [files, setFiles] = React.useState<Record<string, AudioFileMetadata>>({});
             const [filesLoaded, setFilesLoaded] = React.useState(false);
-            const fileInputRef = React.useRef<HTMLInputElement>(null);
+            const update = useForceUpdater();
+            const audioFilesInputRef = React.useRef<HTMLInputElement>(null);
+            const settingsFileInputRef = React.useRef<HTMLInputElement>(null);
 
             const loadFiles = React.useCallback(async () => {
                 try {
@@ -307,17 +316,25 @@ const settings = definePluginSettings({
                 loadFiles();
             }, []);
 
+            const saveAndNotify = async () => {
+                update();
+            };
+
             const resetOverrides = () => {
                 allSoundTypes.forEach(type => {
                     setOverride(type.id, makeEmptyOverride());
                 });
                 clearCache();
-                setResetTrigger(prev => prev + 1);
+                setResetTrigger((prev: number) => prev + 1);
                 showToast("All overrides reset successfully!");
             };
 
-            const triggerFileUpload = () => {
-                fileInputRef.current?.click();
+            const triggerSettingsFileUpload = () => {
+                settingsFileInputRef.current?.click();
+            };
+
+            const triggerAudioFilesUpload = () => {
+                audioFilesInputRef.current?.click();
             };
 
             const handleSettingsUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -344,7 +361,7 @@ const settings = definePluginSettings({
                                 });
                             }
 
-                            setResetTrigger(prev => prev + 1);
+                            setResetTrigger((prev: number) => prev + 1);
                             showToast("Settings imported successfully!");
                         } catch (error) {
                             console.error("Error importing settings:", error);
@@ -355,6 +372,39 @@ const settings = definePluginSettings({
                     reader.readAsText(file);
                     event.target.value = "";
                 }
+            };
+
+            const uploadFiles = async (event: React.ChangeEvent<HTMLInputElement>) => {
+                const { files } = event.target;
+                if (!files) return;
+
+                showToast(files.length > 1 ? `Uploading ${files.length} files...` : "Uploading file...");
+
+                for (const file of files) {
+                    if (!file) continue;
+
+                    const fileExtension = file.name.split(".").pop()?.toLowerCase();
+                    if (!fileExtension || !AUDIO_EXTENSIONS.includes(fileExtension)) {
+                        showToast(`Invalid file type of "${file.name}". Please upload only audio files (.mp3, .wav, .ogg, .m4a, .flac, .aac, .webm, .wma, .mp4).`);
+                        continue;
+                    }
+
+                    try {
+                        const id = await saveAudio(file);
+                        await ensureDataURICached(id);
+                        await saveAndNotify();
+                        await loadFiles();
+
+                        showToast(`Uploaded: ${file.name}`);
+                    } catch (error: any) {
+                        console.error("[CustomSounds] Upload error:", error);
+                        // Show user-friendly error message
+                        const message = error?.message || "Unknown error";
+                        showToast(message.includes("too large") ? message : `Upload of "${file.name}" failed: ${message}`);
+                        continue;
+                    }
+                }
+                event.target.value = "";
             };
 
             const downloadSettings = async () => {
@@ -392,13 +442,46 @@ const settings = definePluginSettings({
 
             return (
                 <div>
-                    <div className="vc-custom-sounds-buttons">
-                        <Button color={Button.Colors.BRAND} onClick={triggerFileUpload}>Import</Button>
-                        <Button color={Button.Colors.PRIMARY} onClick={downloadSettings}>Export</Button>
-                        <Button color={Button.Colors.RED} onClick={resetOverrides}>Reset All</Button>
-                        <Button color={Button.Colors.WHITE} onClick={debugCustomSounds}>Debug</Button>
+                    <Heading>Sounds</Heading>
+                    <div className={cl("buttons")}>
+                        <Button variant="positive" onClick={triggerAudioFilesUpload}>Upload</Button>
+                        <Button
+                            disabled={Object.keys(files).length === 0}
+                            variant="dangerPrimary"
+                            onClick={() => {
+                                Alerts.show({
+                                    title: "Are you sure?",
+                                    body: `This will remove ${Object.keys(files).length} file${Object.keys(files).length === 1 ? "" : "s"} imported into the plugin.`,
+                                    async onConfirm() {
+                                        await clearStore();
+                                        await saveAndNotify();
+                                        await loadFiles();
+                                        showToast("Files removed successfully.");
+                                    },
+                                    confirmText: "Do it!",
+                                    confirmColor: "vc-notification-log-danger-btn",
+                                    cancelText: "Nevermind"
+                                });
+                            }}
+                        >
+                            Remove All</Button>
+                        <Button variant="overlayPrimary" onClick={debugCustomSounds}>Debug</Button>
                         <input
-                            ref={fileInputRef}
+                            ref={audioFilesInputRef}
+                            type="file"
+                            accept=".mp3,.wav,.ogg,.m4a,.flac,.aac,.webm,.wma,.mp4"
+                            multiple
+                            style={{ display: "none" }}
+                            onChange={uploadFiles}
+                        />
+                    </div>
+                    <Heading>Overrides</Heading>
+                    <div className={cl("buttons")}>
+                        <Button variant="primary" onClick={triggerSettingsFileUpload}>Import</Button>
+                        <Button variant="secondary" onClick={downloadSettings}>Export</Button>
+                        <Button variant="dangerPrimary" onClick={resetOverrides}>Reset All</Button>
+                        <input
+                            ref={settingsFileInputRef}
                             type="file"
                             accept=".json"
                             style={{ display: "none" }}
@@ -407,16 +490,16 @@ const settings = definePluginSettings({
                     </div>
 
                     <div className={cl("search")}>
-                        <Forms.FormTitle>Search Sounds</Forms.FormTitle>
+                        <Heading>Search Sounds</Heading>
                         <TextInput
                             value={searchQuery}
-                            onChange={e => setSearchQuery(e)}
+                            onChange={(e: string) => setSearchQuery(e)}
                             placeholder="Search by name or ID"
                         />
                     </div>
 
                     {!filesLoaded ? (
-                        <Forms.FormText>Loading audio files...</Forms.FormText>
+                        <Paragraph>Loading audio files...</Paragraph>
                     ) : (
                         <div className={cl("sounds-list")}>
                             {filteredSoundTypes.map(type => {
@@ -464,7 +547,7 @@ export function findOverride(id: string): SoundOverride | null {
 export default definePlugin({
     name: "CustomSounds",
     description: "Customize Discord's sounds.",
-    authors: [Devs.ScattrdBlade, Devs.TheKodeToad],
+    authors: [{ name: "SyberiaK", id: 355270337702920192n }, Devs.ScattrdBlade, Devs.TheKodeToad],
     patches: [
         {
             find: 'Error("could not play audio")',
