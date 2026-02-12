@@ -17,7 +17,6 @@ import { AudioFileMetadata, deleteAudio, saveAudio } from "./audioStore";
 import { ensureDataURICached } from "./index";
 import { SoundOverride, SoundPlayer, SoundType } from "./types";
 
-const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "m4a", "aac", "flac", "webm", "wma", "mp4"];
 const cl = classNameFactory("vc-custom-sounds-");
 const playSound: (id: string) => SoundPlayer = findByCodeLazy(".playWithListener().then");
 
@@ -31,7 +30,6 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
     files: Record<string, AudioFileMetadata>;
     onFilesChange: () => void;
 }) {
-    const fileInputRef = React.useRef<HTMLInputElement>(null);
     const update = useForceUpdater();
     const sound = React.useRef<SoundPlayer | null>(null);
 
@@ -112,46 +110,12 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
         }
     };
 
-    const uploadFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-
-        const fileExtension = file.name.split(".").pop()?.toLowerCase();
-        if (!fileExtension || !AUDIO_EXTENSIONS.includes(fileExtension)) {
-            showToast("Invalid file type. Please upload an audio file.");
-            event.target.value = "";
-            return;
-        }
-
-        try {
-            showToast("Uploading file...");
-            const id = await saveAudio(file);
-
-            override.selectedFileId = id;
-            override.selectedSound = "custom";
-
-            await ensureDataURICached(id);
-            await saveAndNotify();
-            onFilesChange();
-
-            showToast(`Uploaded: ${file.name}`);
-        } catch (error: any) {
-            console.error("[CustomSounds] Upload error:", error);
-            // Show user-friendly error message
-            const message = error?.message || "Unknown error";
-            showToast(message.includes("too large") ? message : `Upload failed: ${message}`);
-        }
-
-        event.target.value = "";
-    };
-
     const deleteFile = async (id: string) => {
         try {
             await deleteAudio(id);
 
             if (override.selectedFileId === id) {
                 override.selectedFileId = undefined;
-                override.selectedSound = "default";
                 await saveAndNotify();
             }
             onFilesChange();
@@ -269,21 +233,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                                 serialize={opt => opt.value}
                                 className={Margins.bottom8}
                             />
-                            <input
-                                ref={fileInputRef}
-                                type="file"
-                                accept=".mp3,.wav,.ogg,.m4a,.flac,.aac,.webm,.wma,.mp4"
-                                style={{ display: "none" }}
-                                onChange={uploadFile}
-                            />
                             <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
-                                <Button
-                                    onClick={() => fileInputRef.current?.click()}
-                                    color={Button.Colors.BRAND}
-                                >
-                                    Upload New
-                                </Button>
-
                                 {override.selectedFileId && files[override.selectedFileId] && (
                                     <Button
                                         color={Button.Colors.RED}
