@@ -65,6 +65,17 @@ export async function getAllAudio(): Promise<AudioStore> {
     return (await get(STORAGE_KEY)) ?? {};
 }
 
+async function getBufferHashString(buffer: ArrayBuffer): Promise<string> {
+    const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+
+    const hashView = new Uint8Array(hashBuffer);
+
+    const hashString = Array.from(hashView)
+        .map(b => b.toString(16).padStart(2, "0"))
+        .join("");
+    return hashString;
+}
+
 /**
  * Save an audio file with size validation
  */
@@ -76,8 +87,8 @@ export async function saveAudio(file: File): Promise<string> {
         throw new Error(`File too large (${fileMB}MB). Maximum size is ${maxFileSizeMB}MB.`);
     }
 
-    const id = crypto.randomUUID();
     const buffer = await file.arrayBuffer();
+    const id = await getBufferHashString(buffer);
     const dataUri = await generateDataURI(buffer, file.type, file.name);
 
     // Store the audio data (only dataUri, not buffer)
@@ -150,17 +161,19 @@ export async function migrateStorage(): Promise<boolean> {
         console.log("[CustomSounds] Migrating storage to remove redundant buffers...");
         const newAudioStore: AudioStore = {};
 
-        for (const [id, file] of Object.entries(audioStore)) {
+        for (const [file] of Object.values(audioStore)) {
             if (file && typeof file === "object") {
                 // If it has dataUri, keep it; if only buffer, generate dataUri
                 let { dataUri } = file;
                 if (!dataUri && file.buffer) {
                     dataUri = await generateDataURI(file.buffer, file.type, file.name);
                 }
+                // Migrate from random UUIDs to file hashes to make imports actually useful
+                const new_id = await getBufferHashString(file.buffer);
 
                 if (dataUri) {
-                    newAudioStore[id] = {
-                        id: file.id || id,
+                    newAudioStore[new_id] = {
+                        id: new_id,
                         name: file.name || "Unknown",
                         type: file.type || "audio/mpeg",
                         dataUri
