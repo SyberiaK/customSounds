@@ -15,6 +15,8 @@ const DEFAULT_MAX_FILE_SIZE_MB = 15;
 // Configurable max file size (set by plugin settings)
 let maxFileSizeMB = DEFAULT_MAX_FILE_SIZE_MB;
 
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export function setMaxFileSizeMB(sizeMB: number): void {
     maxFileSizeMB = sizeMB;
 }
@@ -138,6 +140,10 @@ export async function clearStore(): Promise<void> {
     await set(METADATA_KEY, {});
 }
 
+function isUUIDLike(s: string): boolean {
+    return UUID_REGEX.test(s);
+}
+
 /**
  * Migrate old storage format to new format (run once on startup)
  */
@@ -150,7 +156,11 @@ export async function migrateStorage(): Promise<boolean> {
 
     // Check if any entries have the old 'buffer' field
     for (const file of Object.values(audioStore)) {
-        if (file && typeof file === "object" && "buffer" in file) {
+        if (!file) continue;
+        if (typeof file !== "object") continue;
+
+        if ("buffer" in file ||
+            ("id" in file && isUUIDLike(file.id))) {
             needsMigration = true;
             break;
         }
@@ -163,28 +173,29 @@ export async function migrateStorage(): Promise<boolean> {
     }
 
     if (needsMigration) {
-        console.log("[CustomSounds] Migrating storage to remove redundant buffers...");
+        console.log("[CustomSounds] Migrating storage to remove redundant buffers and fix IDs...");
         const newAudioStore: AudioStore = {};
 
         for (const [file] of Object.values(audioStore)) {
-            if (file && typeof file === "object") {
+            if (!file || typeof file !== "object") continue;
+
                 // If it has dataUri, keep it; if only buffer, generate dataUri
                 let { dataUri } = file;
                 if (!dataUri && file.buffer) {
                     dataUri = await generateDataURI(file.buffer, file.type, file.name);
                 }
+
+            if (!dataUri) continue;
+
                 // Migrate from random UUIDs to file hashes to make imports actually useful
                 const new_id = await getBufferHashString(file.buffer);
 
-                if (dataUri) {
                     newAudioStore[new_id] = {
                         id: new_id,
                         name: file.name || "Unknown",
                         type: file.type || "audio/mpeg",
                         dataUri
                     };
-                }
-            }
         }
 
         await set(STORAGE_KEY, newAudioStore);
