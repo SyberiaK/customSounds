@@ -20,8 +20,8 @@ import { AudioFileMetadata, clearStore, getAllAudioMetadata, getAudioDataURI, ge
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
 import { makeEmptyOverride, seasonalSounds, SoundOverride, soundTypes } from "./types";
 
-const SEASONAL_IDS = new Set(Object.keys(seasonalSounds));
 const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "m4a", "aac", "flac", "webm", "wma", "mp4"];
+const audioExtensionsString = AUDIO_EXTENSIONS.map(v => `.${v}`).join(", ");
 
 const cl = classNameFactory("vc-custom-sounds-");
 
@@ -164,7 +164,7 @@ function resetSeasonalOverridesToDefault(): void {
     let count = 0;
     for (const soundType of allSoundTypes) {
         const override = getOverride(soundType.id);
-        if (override.enabled && SEASONAL_IDS.has(override.selectedSound)) {
+        if (override.enabled && override.selectedSound in seasonalSounds) {
             override.selectedSound = "default";
             setOverride(soundType.id, override);
             count++;
@@ -385,7 +385,7 @@ const settings = definePluginSettings({
 
                     const fileExtension = file.name.split(".").pop()?.toLowerCase();
                     if (!fileExtension || !AUDIO_EXTENSIONS.includes(fileExtension)) {
-                        showToast(`Invalid file type of "${file.name}". Please upload only audio files (.mp3, .wav, .ogg, .m4a, .flac, .aac, .webm, .wma, .mp4).`);
+                        showToast(`Invalid file type of "${file.name}". Please upload only audio files (${audioExtensionsString}).`);
                         continue;
                     }
 
@@ -395,7 +395,7 @@ const settings = definePluginSettings({
                         await saveAndNotify();
                         await loadFiles();
 
-                        showToast(`Uploaded: ${file.name}`);
+                        showToast(`Added: ${file.name}`);
                     } catch (error: any) {
                         console.error("[CustomSounds] Upload error:", error);
                         // Show user-friendly error message
@@ -421,7 +421,7 @@ const settings = definePluginSettings({
 
                 const exportPayload = {
                     overrides,
-                    __note: "Audio files are not included in exports and will need to be re-uploaded before import"
+                    __note: "Audio files are not included in exports and will need to be re-added before import"
                 };
 
                 const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
@@ -432,7 +432,7 @@ const settings = definePluginSettings({
                 a.click();
                 URL.revokeObjectURL(url);
 
-                showToast(`Exported ${overrides.length} settings (audio files not included)`);
+                showToast(`Exported ${overrides.length} settings. (Audio files are not included!)`);
             };
 
             const filteredSoundTypes = allSoundTypes.filter(type =>
@@ -444,7 +444,7 @@ const settings = definePluginSettings({
                 <div>
                     <Heading>Sounds</Heading>
                     <div className={cl("buttons")}>
-                        <Button variant="positive" onClick={triggerAudioFilesUpload}>Upload</Button>
+                        <Button variant="positive" onClick={triggerAudioFilesUpload}>Add</Button>
                         <Button
                             disabled={Object.keys(files).length === 0}
                             variant="dangerPrimary"
@@ -520,7 +520,7 @@ const settings = definePluginSettings({
                                                     await ensureDataURICached(currentOverride.selectedFileId);
                                                 } catch (error) {
                                                     console.error("[CustomSounds] Failed to load custom sound:", error);
-                                                    showToast("Error loading custom sound file");
+                                                    showToast("Error loading custom sound file. Check console for details.");
                                                 }
                                             }
                                         }}
