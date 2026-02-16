@@ -1,21 +1,30 @@
-**UPDATE: New and improved UI. Added ability to save/upload multiple custom sounds.**
-> [!TIP]
-> **If you run into any issues, please let me know on [Discord](https://discord.gg/jHDJaW9Gyz)**
 # Custom Sounds (Vencord)
-This is a Vencord plugin that allows you to change any native Discord sound. Features custom audio uploads, built-in Discord presets, volume control, sound preview, and settings import/export.
+This is a Vencord plugin that allows you to change any native Discord sound.
 
-## DOWNLOAD INSTRUCTIONS
-You can either __clone__ the repository OR __manually install__ it by downloading it as a zip file.<br/>
+- Custom audio uploads;
+- built-in Discord presets;
+- volume control;
+- sound preview;
+- and importing/exporting your settings.
+
+This fork also features:
+- not broken override imports (should be fixed in the upstream by https://github.com/ScattrdBlade/customSounds/pull/20)
+- actually allowing to upload multiple audio files in one selection!
+
+### Installation
+Requires [Git](https://git-scm.com/) to be installed on your system.
 > [!WARNING]
-> Make sure you have the Vencord [developer build](https://docs.vencord.dev/installing/) installed.<br/>
+> Before you start, you have a [developer build of Vencord](https://docs.vencord.dev/installing/) installed.
 
-### CLONE INSTALLATION
-The cloning installation guide can be found [here](https://discord.com/channels/1015060230222131221/1257038407503446176/1257038407503446176) or via [the official Vencord Docs](https://docs.vencord.dev/installing/custom-plugins/).
-
-### MANUAL INSTALLATION
-> [!IMPORTANT]
-> Inside the `Vencord` folder should be a folder called `src`. If you haven't already, create a folder called `userplugins` inside the `src` folder.
-1. Click the green `<> Code` button at the top right of the repository and select `Download ZIP`
-2. Unzip the downloaded ZIP file into the `userplugins` folder.
-3. Ensure it's structured as `src/userplugins/customSounds` or `src/userplugins/customSounds-main`
-5. Run `pnpm build` in the terminal (command prompt/CMD) and the plugin should be added.
+1. Open Git Bash in Vencord's source code directory.
+   - On Windows, right-click it and click on "Open Git Bash here".
+2. Enter:
+```bash
+cd src && mkdir userplugins && cd userplugins && git clone https://github.com/SyberiaK/customSounds
+```
+3. After it's done, make sure to rebuild and reinject Vencord:
+```bash
+cd ../..
+pnpm build
+pnpm inject
+```
