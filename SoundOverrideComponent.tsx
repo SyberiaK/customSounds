@@ -52,27 +52,27 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
         sound.current?.stop();
 
         if (!override.enabled) {
-            sound.current = playSound(type.id);
+            sound.current = playSound(type.derived ?? type.id);
             return;
         }
 
-        const { selectedSound } = override;
+        const { selectedSound, selectedFileId } = override;
 
         if (selectedSound === "default") {
-            sound.current = playSound(type.id);
+            sound.current = playSound(type.derived ?? type.id);
             return;
         }
         if (selectedSound !== "custom") { // seasonal
             sound.current = playSound(selectedSound);
             return;
         }
-        if (!override.selectedFileId) {
-            sound.current = playSound(type.id);
+        if (!selectedFileId) {
+            sound.current = playSound(type.derived ?? type.id);
             return;
         }
 
         try {
-            const dataUri = await ensureDataURICached(override.selectedFileId);
+            const dataUri = await ensureDataURICached(selectedFileId);
 
             if (!dataUri || !dataUri.startsWith("data:audio/")) {
                 showToast("No custom sound file available for preview");

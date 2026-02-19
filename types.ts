@@ -8,6 +8,7 @@ export interface SoundType {
     name: string;
     id: string;
     seasonal?: string[];
+    derived?: string; // any sound with this is implemented by the plugin
 }
 
 export interface SoundOverride {
@@ -78,6 +79,7 @@ export const soundTypes: readonly SoundType[] = [
     { name: "DDR Up", id: "ddr-up" },
     { name: "Deafen", id: "deafen", seasonal: ["halloween_deafen", "winter_deafen"] },
     { name: "Discodo", id: "discodo" },
+    { name: "Connect (derived from User Join)", id: "connect", derived: "user_join" },
     { name: "Disconnect", id: "disconnect", seasonal: ["halloween_disconnect", "winter_disconnect"] },
     { name: "Ducky Message", id: "ducky_message1" },
     { name: "Hang Status Select", id: "hang_status_select" },
@@ -85,12 +87,13 @@ export const soundTypes: readonly SoundType[] = [
     { name: "Highfive Whistle", id: "highfive_whistle" },
     { name: "Human Man", id: "human_man" },
     { name: "LoFi Message", id: "lofi_message1" },
-    { name: "Mention 1", id: "mention1" },
-    { name: "Mention 2", id: "mention2" },
-    { name: "Mention 3", id: "mention3" },
+    { name: "Mention 1 (@role)", id: "mention1" },
+    { name: "Mention 2 (@everyone)", id: "mention2" },
+    { name: "Mention 3 (unused)", id: "mention3" },
+    { name: "Direct Mention (derived from Message 1)", id: "direct_mention", derived: "mention1" },
     { name: "Message 1", id: "message1", seasonal: ["halloween_message1"] },
-    { name: "Message 2", id: "message2" },
-    { name: "Message 3", id: "message3" },
+    { name: "Message 2 (unused)", id: "message2" },
+    { name: "Message 3 (unused)", id: "message3" },
     { name: "Mute", id: "mute", seasonal: ["halloween_mute", "winter_mute"] },
     { name: "Overlay Unlock", id: "overlayunlock" },
     { name: "Poggermode Achievement", id: "poggermode_achievement_unlock" },
@@ -99,7 +102,7 @@ export const soundTypes: readonly SoundType[] = [
     { name: "Poggermode Message", id: "poggermode_message_send" },
     { name: "PTT Start", id: "ptt_start" },
     { name: "PTT Stop", id: "ptt_stop" },
-    { name: "Reconnect", id: "reconnect" },
+    { name: "Invited to Speak", id: "reconnect" },
     { name: "Robot Man", id: "robot_man" },
     { name: "Stage Waiting", id: "stage_waiting" },
     { name: "Stream Ended", id: "stream_ended" },
@@ -112,7 +115,7 @@ export const soundTypes: readonly SoundType[] = [
     { name: "User Join", id: "user_join", seasonal: ["halloween_user_join", "winter_user_join"] },
     { name: "User Leave", id: "user_leave", seasonal: ["halloween_user_leave", "winter_user_leave"] },
     { name: "User Moved", id: "user_moved" },
-    { name: "Vibing Wumpus", id: "vibing_wumpus" }
+    { name: "Vibing Wumpus", id: "vibing_wumpus" },
 ] as const;
 
 export function makeEmptyOverride(): SoundOverride {

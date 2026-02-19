@@ -14,7 +14,8 @@ import { Devs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
 import { useForceUpdater } from "@utils/react";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
-import { Alerts, React, showToast, TextInput } from "@webpack/common";
+import { MessageJSON } from "@vencord/discord-types";
+import { Alerts, React, showToast, TextInput, UserStore } from "@webpack/common";
 
 import { AudioFileMetadata, clearStore, getAllAudioMetadata, getAudioDataURI, getMaxFileSizeMB, getStorageInfo, migrateStorage, saveAudio, setMaxFileSizeMB } from "./audioStore";
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
@@ -346,20 +347,20 @@ const settings = definePluginSettings({
                             resetOverrides();
                             const imported = JSON.parse(e.target?.result as string);
 
-                            if (imported.overrides && Array.isArray(imported.overrides)) {
-                                imported.overrides.forEach((setting: any) => {
-                                    if (setting.id) {
-                                        const override: SoundOverride = {
-                                            enabled: setting.enabled ?? false,
-                                            selectedSound: setting.selectedSound ?? "default",
-                                            selectedFileId: setting.selectedFileId ?? undefined,
-                                            volume: setting.volume ?? 100,
-                                            useFile: false
-                                        };
-                                        setOverride(setting.id, override);
-                                    }
-                                });
-                            }
+                        if (imported.overrides && Array.isArray(imported.overrides)) {
+                            imported.overrides.forEach((setting: any) => {
+                                if (!setting.id) return;
+
+                                const override: SoundOverride = {
+                                    enabled: setting.enabled ?? false,
+                                    selectedSound: setting.selectedSound ?? "default",
+                                    selectedFileId: setting.selectedFileId ?? undefined,
+                                    volume: setting.volume ?? 100,
+                                    useFile: false
+                                };
+                                setOverride(setting.id, override);
+                            });
+                        }
 
                             setResetTrigger((prev: number) => prev + 1);
                             showToast("Settings imported successfully!");
@@ -544,10 +545,22 @@ export function findOverride(id: string): SoundOverride | null {
     return override?.enabled ? override : null;
 }
 
+export function getCustomMentionSoundID(message: MessageJSON): string | null {
+    if (message.mentions.some(m => m.id === UserStore.getCurrentUser().id))
+        return "direct_mention";
+    if (message.mention_everyone)
+        return "mention2";
+    if (message.mention_roles)
+        return "mention1";
+
+    return null;
+}
+
 export default definePlugin({
     name: "CustomSounds",
     description: "Customize Discord's sounds.",
     authors: [{ name: "SyberiaK", id: 355270337702920192n }, Devs.ScattrdBlade, Devs.TheKodeToad],
+    settings,
     patches: [
         {
             find: 'Error("could not play audio")',
@@ -568,9 +581,23 @@ export default definePlugin({
                 match: /\i\.\i\.getSoundpack\(\)/,
                 replace: '$self.isOverriden(arguments[0]) ? "classic" : $&'
             }
+        },
+        {
+            find: ".connectHasStarted",
+            replacement: {
+                match: /return;return"user_join"/,
+                replace: 'return;return $self.isOverriden("connect") ? "connect" : "user_join"'
+            }
+        },
+        {
+            find: ".getDesktopType()===",
+            replacement: {
+                match: /sound:(\i\?\i:void 0,volume:\i,onClick)/,
+                replace: "sound:$self.getCustomMentionSoundID(arguments[0]?.message)??$1"
+            }
         }
     ],
-    settings,
+    getCustomMentionSoundID,
     findOverride,
     isOverriden,
     getCustomSoundURL,
