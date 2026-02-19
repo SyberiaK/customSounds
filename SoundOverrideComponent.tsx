@@ -131,7 +131,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
             showToast("File deleted successfully");
         } catch (error) {
             console.error("[CustomSounds] Error deleting file:", error);
-            showToast("Error deleting file.");
+            showToast("Error deleting file. Check console for details.");
         }
     };
 
@@ -155,7 +155,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                             await ensureDataURICached(override.selectedFileId);
                         } catch (error) {
                             console.error("[CustomSounds] Failed to load custom sound:", error);
-                            showToast("Error loading custom sound file.");
+                            showToast("Error loading custom sound file. Check console for details.");
                         }
                     }
 
