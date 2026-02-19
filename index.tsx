@@ -14,8 +14,7 @@ import { Devs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
 import { useForceUpdater } from "@utils/react";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
-import { MessageJSON } from "@vencord/discord-types";
-import { Alerts, React, showToast, TextInput, UserStore } from "@webpack/common";
+import { Alerts, React, showToast, TextInput } from "@webpack/common";
 
 import { AudioFileMetadata, clearStore, getAllAudioMetadata, getAudioDataURI, getMaxFileSizeMB, getStorageInfo, migrateStorage, saveAudio, setMaxFileSizeMB } from "./audioStore";
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
@@ -544,17 +543,6 @@ export function findOverride(id: string): SoundOverride | null {
     return override?.enabled ? override : null;
 }
 
-export function getCustomMentionSoundID(message: MessageJSON): string | null {
-    if (message.mentions.some(m => m.id === UserStore.getCurrentUser().id))
-        return "direct_mention";
-    if (message.mention_everyone)
-        return "mention2";
-    if (message.mention_roles)
-        return "mention1";
-
-    return null;
-}
-
 export default definePlugin({
     name: "CustomSounds",
     description: "Customize Discord's sounds.",
@@ -588,15 +576,7 @@ export default definePlugin({
                 replace: 'return;return $self.isOverriden("connect") ? "connect" : "user_join"'
             }
         },
-        {
-            find: ".getDesktopType()===",
-            replacement: {
-                match: /sound:(\i\?\i:void 0,volume:\i,onClick)/,
-                replace: "sound:$self.getCustomMentionSoundID(arguments[0]?.message)??$1"
-            }
-        }
     ],
-    getCustomMentionSoundID,
     findOverride,
     isOverriden,
     getCustomSoundURL,
