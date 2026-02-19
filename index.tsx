@@ -340,12 +340,12 @@ const settings = definePluginSettings({
 
             const handleSettingsUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
                 const file = event.target.files?.[0];
-                if (file) {
-                    const reader = new FileReader();
-                    reader.onload = async (e: ProgressEvent<FileReader>) => {
-                        try {
-                            resetOverrides();
-                            const imported = JSON.parse(e.target?.result as string);
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = async (e: ProgressEvent<FileReader>) => {
+                    try {
+                        resetOverrides();
+                        const imported = JSON.parse(e.target?.result as string);
 
                         if (imported.overrides && Array.isArray(imported.overrides)) {
                             imported.overrides.forEach((setting: any) => {
@@ -362,17 +362,16 @@ const settings = definePluginSettings({
                             });
                         }
 
-                            setResetTrigger((prev: number) => prev + 1);
-                            showToast("Settings imported successfully!");
-                        } catch (error) {
-                            console.error("Error importing settings:", error);
-                            showToast("Error importing settings. Check console for details.");
-                        }
-                    };
+                        setResetTrigger((prev: number) => prev + 1);
+                        showToast("Settings imported successfully!");
+                    } catch (error) {
+                        console.error("Error importing settings:", error);
+                        showToast("Error importing settings. Check console for details.");
+                    }
+                };
 
-                    reader.readAsText(file);
-                    event.target.value = "";
-                }
+                reader.readAsText(file);
+                event.target.value = "";
             };
 
             const uploadFiles = async (event: React.ChangeEvent<HTMLInputElement>) => {
