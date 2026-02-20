@@ -316,10 +316,6 @@ const settings = definePluginSettings({
                 loadFiles();
             }, []);
 
-            const saveAndNotify = async () => {
-                update();
-            };
-
             const resetOverrides = () => {
                 allSoundTypes.forEach(type => {
                     setOverride(type.id, makeEmptyOverride());
@@ -327,14 +323,6 @@ const settings = definePluginSettings({
                 clearCache();
                 setResetTrigger((prev: number) => prev + 1);
                 showToast("All overrides reset successfully!");
-            };
-
-            const triggerSettingsFileUpload = () => {
-                settingsFileInputRef.current?.click();
-            };
-
-            const triggerAudioFilesUpload = () => {
-                audioFilesInputRef.current?.click();
             };
 
             const handleSettingsUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -391,13 +379,12 @@ const settings = definePluginSettings({
                     try {
                         const id = await saveAudio(file);
                         await ensureDataURICached(id);
-                        await saveAndNotify();
+                        update();
                         await loadFiles();
 
                         showToast(`Added: ${file.name}`);
                     } catch (error: any) {
                         console.error("[CustomSounds] Upload error:", error);
-                        // Show user-friendly error message
                         const message = error?.message || "Unknown error";
                         showToast(message.includes("too large") ? message : `Upload of "${file.name}" failed: ${message}`);
                         continue;
@@ -443,7 +430,7 @@ const settings = definePluginSettings({
                 <div>
                     <Heading>Sounds</Heading>
                     <div className={cl("buttons")}>
-                        <Button variant="positive" onClick={triggerAudioFilesUpload}>Add</Button>
+                        <Button variant="positive" onClick={() => audioFilesInputRef.current?.click()}>Add</Button>
                         <Button
                             disabled={Object.keys(files).length === 0}
                             variant="dangerPrimary"
@@ -453,7 +440,7 @@ const settings = definePluginSettings({
                                     body: `This will remove ${Object.keys(files).length} file${Object.keys(files).length === 1 ? "" : "s"} imported into the plugin.`,
                                     async onConfirm() {
                                         await clearStore();
-                                        await saveAndNotify();
+                                        update();
                                         await loadFiles();
                                         showToast("Files removed successfully.");
                                     },
@@ -476,7 +463,7 @@ const settings = definePluginSettings({
                     </div>
                     <Heading>Overrides</Heading>
                     <div className={cl("buttons")}>
-                        <Button variant="primary" onClick={triggerSettingsFileUpload}>Import</Button>
+                        <Button variant="primary" onClick={() => settingsFileInputRef.current?.click()}>Import</Button>
                         <Button variant="secondary" onClick={downloadSettings}>Export</Button>
                         <Button variant="dangerPrimary" onClick={resetOverrides}>Reset All</Button>
                         <input
