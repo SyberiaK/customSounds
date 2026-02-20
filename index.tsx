@@ -335,15 +335,15 @@ const settings = definePluginSettings({
                         const imported = JSON.parse(e.target?.result as string);
 
                         if (imported.overrides && Array.isArray(imported.overrides)) {
+                            const empty = makeEmptyOverride();
                             imported.overrides.forEach((setting: any) => {
                                 if (!setting.id) return;
 
                                 const override: SoundOverride = {
-                                    enabled: setting.enabled ?? false,
-                                    selectedSound: setting.selectedSound ?? "default",
-                                    selectedFileId: setting.selectedFileId ?? undefined,
-                                    volume: setting.volume ?? 100,
-                                    useFile: false
+                                    enabled: setting.enabled ?? empty.enabled,
+                                    selectedSound: setting.selectedSound ?? empty.selectedSound,
+                                    selectedFileId: setting.selectedFileId ?? empty.selectedFileId,
+                                    volume: setting.volume ?? empty.volume,
                                 };
                                 setOverride(setting.id, override);
                             });

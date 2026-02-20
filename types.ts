@@ -15,7 +15,6 @@ export interface SoundOverride {
     enabled: boolean;
     selectedSound: string;
     volume: number;
-    useFile: boolean;
     selectedFileId?: string;
 }
 
@@ -122,7 +121,6 @@ export function makeEmptyOverride(): SoundOverride {
         enabled: false,
         selectedSound: "default",
         volume: 100,
-        useFile: false,
         selectedFileId: undefined
     };
 }
