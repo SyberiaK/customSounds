@@ -14,7 +14,7 @@ This fork also features:
 
 > [!WARNING]
 > <details>
-> <summary>**Using Vencord violates Discord's terms of service.**</summary>
+> <summary>Using Vencord violates Discord's terms of service.</summary>
 >
 > Client modifications are against Discord’s Terms of Service.
 >
