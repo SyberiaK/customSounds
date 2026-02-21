@@ -46,29 +46,37 @@ type MetadataStore = Record<string, AudioFileMetadata>;
 type AudioStore = Record<string, StoredAudioFile>;
 
 /**
- * Get only metadata (lightweight, no audio data loaded)
+ * Returns audio files metadata.
  */
 export async function getAllAudioMetadata(): Promise<MetadataStore> {
-    return (await get(METADATA_KEY)) ?? {};
+    return (await get(METADATA_KEY)) as MetadataStore ?? {};
+}
+
+async function setMetadataStore(new_: MetadataStore): Promise<void> {
+    await set(METADATA_KEY, new_);
 }
 
 /**
- * Get a single audio file's data URI without loading all files
+ * Returns a single audio file's data URI.
  */
 export async function getAudioDataURI(id: string): Promise<string | undefined> {
-    const all = (await get(STORAGE_KEY)) as AudioStore | undefined;
+    const all: AudioStore = await getAllAudio();
     return all?.[id]?.dataUri;
 }
 
 /**
- * Get all audio files (use sparingly - loads all data)
+ * Returns all audio files (use sparingly as it loads all the data)
  */
 export async function getAllAudio(): Promise<AudioStore> {
-    return (await get(STORAGE_KEY)) ?? {};
+    return (await get(STORAGE_KEY)) as AudioStore ?? {};
+}
+
+async function setAudioStore(new_: AudioStore): Promise<void> {
+    await set(STORAGE_KEY, new_);
 }
 
 async function getBufferHashString(buffer: ArrayBuffer): Promise<string> {
-    const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
+    const hashBuffer: ArrayBuffer = await crypto.subtle.digest("SHA-256", buffer);
 
     const hashView = new Uint8Array(hashBuffer);
 
@@ -156,27 +164,30 @@ async function processAudioFile(file: File): Promise<[string, StoredAudioFile, A
 }
 
 /**
- * Delete an audio file
+ * Deletes an audio file.
  */
 export async function deleteAudio(id: string): Promise<void> {
     // Delete from audio store
-    const audioStore = (await get(STORAGE_KEY)) as AudioStore ?? {};
+    const audioStore: AudioStore = await getAllAudio();
     if (audioStore[id]) {
         delete audioStore[id];
-        await set(STORAGE_KEY, audioStore);
+        await setAudioStore(audioStore);
     }
 
     // Delete from metadata store
-    const metadataStore = (await get(METADATA_KEY)) as MetadataStore ?? {};
+    const metadataStore: MetadataStore = await getAllAudioMetadata();
     if (metadataStore[id]) {
         delete metadataStore[id];
-        await set(METADATA_KEY, metadataStore);
+        await setMetadataStore(metadataStore);
     }
 }
 
+/**
+ * Deletes all audio files.
+ */
 export async function clearStore(): Promise<void> {
-    await set(STORAGE_KEY, {});
-    await set(METADATA_KEY, {});
+    await setAudioStore({});
+    await setMetadataStore({});
 }
 
 function isUUIDLike(s: string): boolean {
@@ -184,7 +195,7 @@ function isUUIDLike(s: string): boolean {
 }
 
 /**
- * Migrate old storage format to new format (run once on startup)
+ * Migrates old storage format to new format (run once on startup).
  */
 export async function migrateStorage(): Promise<boolean> {
     const audioStore = (await get(STORAGE_KEY)) as Record<string, any> | undefined;
@@ -237,14 +248,14 @@ export async function migrateStorage(): Promise<boolean> {
             };
         }
 
-        await set(STORAGE_KEY, newAudioStore);
+        await setAudioStore(newAudioStore);
         needsMetadataRebuild = true;
         console.log("[CustomSounds] Storage migration complete");
     }
 
     if (needsMetadataRebuild) {
         console.log("[CustomSounds] Rebuilding metadata index...");
-        const currentAudioStore = (await get(STORAGE_KEY)) as AudioStore ?? {};
+        const currentAudioStore = await getAllAudio();
         const newMetadataStore: MetadataStore = {};
 
         for (const [id, file] of Object.entries(currentAudioStore)) {
@@ -256,7 +267,7 @@ export async function migrateStorage(): Promise<boolean> {
             };
         }
 
-        await set(METADATA_KEY, newMetadataStore);
+        await setMetadataStore(newMetadataStore);
         console.log("[CustomSounds] Metadata rebuild complete");
     }
 
@@ -296,7 +307,7 @@ async function generateDataURI(buffer: ArrayBuffer, type: string, name: string):
 }
 
 /**
- * Get total storage usage info
+ * Returns total storage usage info in an object.
  */
 export async function getStorageInfo(): Promise<{ fileCount: number; totalSizeKB: number; }> {
     const metadata = await getAllAudioMetadata();
