@@ -317,10 +317,7 @@ const settings = definePluginSettings({
             }, []);
 
             const resetOverrides = () => {
-                allSoundTypes.forEach(type => {
-                    setOverride(type.id, makeEmptyOverride());
-                });
-                clearCache();
+                allSoundTypes.forEach(type => setOverride(type.id, makeEmptyOverride()));
                 setResetTrigger((prev: number) => prev + 1);
                 showToast("All overrides reset successfully!");
             };
