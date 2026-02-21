@@ -432,8 +432,14 @@ const settings = definePluginSettings({
                                     body: `This will remove ${Object.keys(files).length} file${Object.keys(files).length === 1 ? "" : "s"} imported into the plugin.`,
                                     async onConfirm() {
                                         await clearStore();
+                                        clearCache();
                                         update();
                                         await loadFiles();
+                                        allSoundTypes.forEach(type => {
+                                            const override = getOverride(type.id);
+                                            override.selectedFileId = undefined;
+                                            setOverride(type.id, override);
+                                        });
                                         showToast("Files removed successfully.");
                                     },
                                     confirmText: "Do it!",
