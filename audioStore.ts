@@ -79,10 +79,55 @@ async function getBufferHashString(buffer: ArrayBuffer): Promise<string> {
 }
 
 /**
- * Save an audio file with size validation
+ * Saves an audio file.
+ *
+ * If the file exceeds the size limit, throws an `Error`.
  */
-export async function saveAudio(file: File): Promise<string> {
-    // Validate file size before processing
+export async function saveAudioFile(file: File): Promise<string> {
+    const [id, audioData, metadata] = await processAudioFile(file);
+
+    // Store the audio data (only dataUri, not buffer)
+    const audioStore: AudioStore = await getAllAudio();
+    audioStore[id] = audioData;
+    await setAudioStore(audioStore);
+
+    // Store metadata separately for fast access
+    const metadataStore: MetadataStore = await getAllAudioMetadata();
+    metadataStore[id] = metadata;
+    await setMetadataStore(metadataStore);
+
+    return id;
+}
+
+
+/**
+ * Saves multiple audio files.
+ *
+ * Returns an array, where each upload is represented with either a file ID string (if success) or `Error`.
+ */
+export async function saveAudioFiles(files: File[]): Promise<(string | Error)[]> {
+    const results: (string | Error)[] = [];
+    const audioStore: AudioStore = await getAllAudio();
+    const metadataStore: MetadataStore = await getAllAudioMetadata();
+
+    for (const file of files) {
+        try {
+            const [id, audioData, metadata] = await processAudioFile(file);
+            audioStore[id] = audioData;
+            metadataStore[id] = metadata;
+            results.push(id);
+        } catch (error: any) {
+            results.push(error as Error);
+        }
+    }
+
+    await setAudioStore(audioStore);
+    await setMetadataStore(metadataStore);
+
+    return results;
+}
+
+async function processAudioFile(file: File): Promise<[string, StoredAudioFile, AudioFileMetadata]> {
     const maxBytes = maxFileSizeMB * 1024 * 1024;
     if (file.size > maxBytes) {
         const fileMB = (file.size / (1024 * 1024)).toFixed(1);
@@ -93,27 +138,21 @@ export async function saveAudio(file: File): Promise<string> {
     const id = await getBufferHashString(buffer);
     const dataUri = await generateDataURI(buffer, file.type, file.name);
 
-    // Store the audio data (only dataUri, not buffer)
-    const audioStore = (await get(STORAGE_KEY)) as AudioStore ?? {};
-    audioStore[id] = {
+    return [
         id,
-        name: file.name,
-        type: file.type,
-        dataUri
-    };
-    await set(STORAGE_KEY, audioStore);
-
-    // Store metadata separately for fast access
-    const metadataStore = (await get(METADATA_KEY)) as MetadataStore ?? {};
-    metadataStore[id] = {
-        id,
-        name: file.name,
-        type: file.type,
-        size: dataUri.length
-    };
-    await set(METADATA_KEY, metadataStore);
-
-    return id;
+        {
+            id,
+            name: file.name,
+            type: file.type,
+            dataUri
+        },
+        {
+            id,
+            name: file.name,
+            type: file.type,
+            size: dataUri.length
+        }
+    ];
 }
 
 /**
