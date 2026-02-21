@@ -18,28 +18,29 @@ import { Alerts, React, showToast, TextInput } from "@webpack/common";
 
 import { AudioFileMetadata, clearStore, getAllAudioMetadata, getAudioDataURI, getMaxFileSizeMB, getStorageInfo, migrateStorage, saveAudioFiles, setMaxFileSizeMB } from "./audioStore";
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
-import { makeEmptyOverride, seasonalSounds, SoundOverride, soundTypes } from "./types";
+import { makeEmptyOverride, SEASONAL_SOUNDS, SOUND_TYPES, SoundOverride } from "./types";
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "m4a", "aac", "flac", "webm", "wma", "mp4"];
 const audioExtensionsString = AUDIO_EXTENSIONS.map(v => `.${v}`).join(", ");
 
 const cl = classNameFactory("vc-custom-sounds-");
 
-const allSoundTypes = soundTypes || [];
+const allSoundTypes = SOUND_TYPES || [];
 
+const MIN_CACHE_SIZE_MB_CAP = 5;
+const MAX_CACHE_SIZE_MB_CAP = 500;
 // LRU-style cache with dynamic size limit based on max file size setting
-// Cache size = max file size * 5 (allows caching several files)
-// Base64 encoding adds ~37% overhead, so we account for that
+// Cache size = max file size * 5 (todo: magic number grrr)
+// also account for base64 encoding (~37% overhead)
 const BASE64_OVERHEAD = 1.37;
 let maxCacheSizeBytes = 100 * 1024 * 1024; // Default 100MB, updated on start
 const dataUriCache = new Map<string, string>();
 let currentCacheSize = 0;
 
 function updateCacheLimit(maxFileSizeMB: number): void {
-    // Cache can hold ~5 files at max size (accounting for base64 overhead)
-    // Minimum 50MB, maximum 500MB to prevent extreme memory usage
+    // calculate for 5 files at max size (accounting for base64 overhead)
     const calculatedSize = Math.round(maxFileSizeMB * BASE64_OVERHEAD * 5);
-    maxCacheSizeBytes = Math.min(Math.max(calculatedSize, 50), 500) * 1024 * 1024;
+    maxCacheSizeBytes = Math.min(Math.max(calculatedSize, MIN_CACHE_SIZE_MB_CAP), MAX_CACHE_SIZE_MB_CAP) * 1024 * 1024;
 }
 
 function addToCache(fileId: string, dataUri: string): void {
@@ -93,40 +94,29 @@ function getOverride(id: string): SoundOverride {
     }
 }
 
-function setOverride(id: string, override: SoundOverride) {
+function setOverride(id: string, override: SoundOverride): void {
     settings.store[id] = JSON.stringify(override);
 }
 
 export function getCustomSoundURL(id: string): string | null {
     const override = getOverride(id);
 
-    if (!override?.enabled) {
-        return null;
-    }
+    if (!override?.enabled) return null;
 
     if (override.selectedSound === "custom" && override.selectedFileId) {
-        const dataUri = getFromCache(override.selectedFileId);
-        if (dataUri) {
-            return dataUri;
-        }
-        // Cache miss - this shouldn't happen if preloading worked, but don't block
-        return null;
+        // null => cache miss - shouldn't happen if preloading worked, but don't block
+        return getFromCache(override.selectedFileId) ?? null;
     }
 
     if (override.selectedSound !== "default" && override.selectedSound !== "custom") {
-        if (override.selectedSound in seasonalSounds) {
-            return seasonalSounds[override.selectedSound];
-        }
+        if (override.selectedSound in SEASONAL_SOUNDS) return SEASONAL_SOUNDS[override.selectedSound];
 
         const soundType = allSoundTypes.find(t => t.id === id);
-        if (soundType?.seasonal) {
-            const seasonalId = soundType.seasonal.find(seasonalId =>
-                seasonalId.startsWith(`${override.selectedSound}_`)
-            );
-            if (seasonalId && seasonalId in seasonalSounds) {
-                return seasonalSounds[seasonalId];
-            }
-        }
+        if (!soundType?.seasonal) return null;
+
+        const seasonalId = soundType.seasonal.find(id => id.startsWith(`${override.selectedSound}_`));
+        if (seasonalId && seasonalId in SEASONAL_SOUNDS)
+            return SEASONAL_SOUNDS[seasonalId];
     }
 
     return null;
@@ -134,9 +124,7 @@ export function getCustomSoundURL(id: string): string | null {
 
 export async function ensureDataURICached(fileId: string): Promise<string | null> {
     const cached = getFromCache(fileId);
-    if (cached) {
-        return cached;
-    }
+    if (cached) return cached;
 
     try {
         const dataUri = await getAudioDataURI(fileId);
@@ -153,9 +141,7 @@ export async function ensureDataURICached(fileId: string): Promise<string | null
 
 export async function refreshDataURI(id: string): Promise<void> {
     const override = getOverride(id);
-    if (!override?.selectedFileId) {
-        return;
-    }
+    if (!override?.selectedFileId) return;
 
     await ensureDataURICached(override.selectedFileId);
 }
@@ -164,15 +150,13 @@ function resetSeasonalOverridesToDefault(): void {
     let count = 0;
     for (const soundType of allSoundTypes) {
         const override = getOverride(soundType.id);
-        if (override.enabled && override.selectedSound in seasonalSounds) {
+        if (override.enabled && override.selectedSound in SEASONAL_SOUNDS) {
             override.selectedSound = "default";
             setOverride(soundType.id, override);
             count++;
         }
     }
-    if (count > 0) {
-        console.log(`[CustomSounds] Reset ${count} seasonal sound(s) to default`);
-    }
+    if (count > 0) console.log(`[CustomSounds] Reset ${count} seasonal sound(s) to default`);
 }
 
 async function preloadDataURIs() {
@@ -186,9 +170,7 @@ async function preloadDataURIs() {
         }
     }
 
-    if (fileIdsToPreload.size === 0) {
-        return;
-    }
+    if (fileIdsToPreload.size === 0) return;
 
     // Preload each unique file (avoids duplicate loads if same file used for multiple sounds)
     let loaded = 0;
@@ -324,7 +306,9 @@ const settings = definePluginSettings({
 
             const handleSettingsUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
                 const file = event.target.files?.[0];
+
                 if (!file) return;
+
                 const reader = new FileReader();
                 reader.onload = async (e: ProgressEvent<FileReader>) => {
                     try {

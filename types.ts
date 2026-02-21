@@ -25,7 +25,7 @@ export interface SoundPlayer {
     stop(): void;
 }
 
-export const seasonalSounds = {
+export const SEASONAL_SOUNDS = {
     "halloween_call_calling": "https://canary.discord.com/assets/0950a7ea4f1dd037870b.mp3",
     "winter_call_calling": "https://canary.discord.com/assets/7b945e7be3f86c5b7c82.mp3",
     "halloween_call_ringing": "https://canary.discord.com/assets/1b883b366ae11a303b82.mp3",
@@ -50,7 +50,7 @@ export const seasonalSounds = {
     "winter_user_leave": "https://canary.discord.com/assets/ec3d9eaea30b33e16da6.mp3"
 } as const;
 
-export const soundTypes: readonly SoundType[] = [
+export const SOUND_TYPES: readonly SoundType[] = [
     { name: "Activity End", id: "activity_end" },
     { name: "Activity Launch", id: "activity_launch" },
     { name: "Activity User Join", id: "activity_user_join" },
