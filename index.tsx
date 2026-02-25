@@ -14,6 +14,7 @@ import { Devs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
 import { useForceUpdater } from "@utils/react";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
+import { saveFile } from "@utils/web";
 import { Alerts, React, showToast, TextInput } from "@webpack/common";
 
 import * as AudioStore from "./audioStore";
@@ -405,13 +406,12 @@ const settings = definePluginSettings({
                     __note: "Audio files are not included in exports and will need to be re-added before import"
                 };
 
-                const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = "customSounds-settings.json";
-                a.click();
-                URL.revokeObjectURL(url);
+                const file = new File(
+                    [JSON.stringify(exportPayload, null, 2)],
+                    "customSounds-settings.json",
+                    { type: "application/json" }
+                );
+                saveFile(file);
 
                 showToast(`Exported ${overrides.length} settings. (Audio files are not included!)`);
             };
