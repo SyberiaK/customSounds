@@ -13,7 +13,7 @@ export interface SoundType {
 
 export interface SoundOverride {
     enabled: boolean;
-    selectedSound: string;
+    selectedSound: "default" | "custom" | (string & {});
     volume: number;
     selectedFileId?: string;
 }
