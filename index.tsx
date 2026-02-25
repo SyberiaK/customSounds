@@ -16,7 +16,7 @@ import { useForceUpdater } from "@utils/react";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
 import { Alerts, React, showToast, TextInput } from "@webpack/common";
 
-import { AudioFileMetadata, clearStore, getAllAudioMetadata, getAudioDataURI, getMaxFileSizeMB, getStorageInfo, migrateStorage, saveAudioFiles, setMaxFileSizeMB } from "./audioStore";
+import * as AudioStore from "./audioStore";
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
 import { makeEmptyOverride, SEASONAL_SOUNDS, SOUND_TYPES, SoundOverride } from "./types";
 
@@ -29,32 +29,35 @@ const allSoundTypes = SOUND_TYPES || [];
 
 const MIN_CACHE_SIZE_MB_CAP = 5;
 const MAX_CACHE_SIZE_MB_CAP = 500;
+
 // LRU-style cache with dynamic size limit based on max file size setting
-// Cache size = max file size * 5 (todo: magic number grrr)
-// also account for base64 encoding (~37% overhead)
+const MAX_FILES_CACHED_AT_MAX_SIZE = 5;
 const BASE64_OVERHEAD = 1.37;
+const CACHE_SIZE_MULTIPLIER = BASE64_OVERHEAD * MAX_FILES_CACHED_AT_MAX_SIZE;
+
 let maxCacheSizeBytes = 100 * 1024 * 1024; // Default 100MB, updated on start
 const dataUriCache = new Map<string, string>();
 let currentCacheSize = 0;
 
 function updateCacheLimit(maxFileSizeMB: number): void {
     // calculate for 5 files at max size (accounting for base64 overhead)
-    const calculatedSize = Math.round(maxFileSizeMB * BASE64_OVERHEAD * 5);
+    const calculatedSize = Math.round(maxFileSizeMB * CACHE_SIZE_MULTIPLIER);
     maxCacheSizeBytes = Math.min(Math.max(calculatedSize, MIN_CACHE_SIZE_MB_CAP), MAX_CACHE_SIZE_MB_CAP) * 1024 * 1024;
 }
 
 function addToCache(fileId: string, dataUri: string): void {
     const uriSize = dataUri.length;
 
-    // If this single item is larger than the max cache, don't cache it
     if (uriSize > maxCacheSizeBytes) {
         console.warn(`[CustomSounds] File too large to cache (${Math.round(uriSize / (1024 * 1024))}MB > ${Math.round(maxCacheSizeBytes / (1024 * 1024))}MB limit)`);
         return;
     }
 
-    // Evict oldest entries if needed (Map maintains insertion order)
+    // Evict oldest entries if needed (maintain insertion order)
     while (currentCacheSize + uriSize > maxCacheSizeBytes && dataUriCache.size > 0) {
         const oldestKey = dataUriCache.keys().next().value;
+
+        // todo: isn't `dataUriCache.size > 0` there to ensure at least one key is present?
         if (oldestKey) {
             const oldestSize = dataUriCache.get(oldestKey)?.length || 0;
             dataUriCache.delete(oldestKey);
@@ -127,7 +130,7 @@ export async function ensureDataURICached(fileId: string): Promise<string | null
     if (cached) return cached;
 
     try {
-        const dataUri = await getAudioDataURI(fileId);
+        const dataUri = await AudioStore.getAudioDataURI(fileId);
         if (dataUri) {
             addToCache(fileId, dataUri);
             return dataUri;
@@ -159,7 +162,7 @@ function resetSeasonalOverridesToDefault(): void {
     if (count > 0) console.log(`[CustomSounds] Reset ${count} seasonal sound(s) to default`);
 }
 
-async function preloadDataURIs() {
+async function preloadDataURIs(): Promise<void> {
     // Collect unique file IDs that need preloading
     const fileIdsToPreload = new Set<string>();
 
@@ -186,15 +189,15 @@ async function preloadDataURIs() {
     console.log(`[CustomSounds] Preloaded ${loaded}/${fileIdsToPreload.size} custom sounds`);
 }
 
-export async function debugCustomSounds() {
+export async function debugCustomSounds(): Promise<void> {
     console.log("[CustomSounds] === DEBUG INFO ===");
 
     // Settings info
-    console.log(`[CustomSounds] Max file size: ${getMaxFileSizeMB()}MB`);
+    console.log(`[CustomSounds] Max file size: ${AudioStore.getMaxFileSizeMB()}MB`);
     console.log(`[CustomSounds] Max cache size: ${Math.round(maxCacheSizeBytes / (1024 * 1024))}MB`);
 
     // Storage info
-    const storageInfo = await getStorageInfo();
+    const storageInfo = await AudioStore.getStorageInfo();
     console.log(`[CustomSounds] Stored files: ${storageInfo.fileCount}, Total size: ${storageInfo.totalSizeKB}KB`);
 
     // Memory cache info
@@ -217,7 +220,7 @@ export async function debugCustomSounds() {
     console.log(`[CustomSounds] Enabled overrides: ${enabledCount} (${customSoundCount} custom)`);
 
     // List all files
-    const metadata = await getAllAudioMetadata();
+    const metadata = await AudioStore.getAllAudioMetadata();
     console.log("[CustomSounds] Audio files:");
     for (const [id, file] of Object.entries(metadata)) {
         console.log(`  - ${file.name} (${Math.round(file.size / 1024)}KB) [${id}]`);
@@ -253,11 +256,11 @@ const settings = definePluginSettings({
     ...soundSettings,
     maxFileSize: {
         type: OptionType.SELECT,
-        description: "Maximum file size for custom audio uploads. Larger sizes use more memory and may cause performance issues or crashes on lower-end devices. Increase at your own risk!",
+        description: "Maximum file size for custom audio uploads. Larger sizes use more memory, take more time to process and may cause performance issues or crashes on lower-end devices. Increase at your own risk!",
         options: fileSizeOptions,
         default: 15,
         onChange: (value: number) => {
-            setMaxFileSizeMB(value);
+            AudioStore.setMaxFileSizeMB(value);
             updateCacheLimit(value);
         }
     },
@@ -272,7 +275,7 @@ const settings = definePluginSettings({
         component: () => {
             const [resetTrigger, setResetTrigger] = React.useState(0);
             const [searchQuery, setSearchQuery] = React.useState("");
-            const [files, setFiles] = React.useState<Record<string, AudioFileMetadata>>({});
+            const [files, setFiles] = React.useState<Record<string, AudioStore.AudioFileMetadata>>({});
             const [filesLoaded, setFilesLoaded] = React.useState(false);
             const update = useForceUpdater();
             const audioFilesInputRef = React.useRef<HTMLInputElement>(null);
@@ -280,7 +283,7 @@ const settings = definePluginSettings({
 
             const loadFiles = React.useCallback(async () => {
                 try {
-                    const metadata = await getAllAudioMetadata();
+                    const metadata = await AudioStore.getAllAudioMetadata();
                     setFiles(metadata);
                     setFilesLoaded(true);
                 } catch (error) {
@@ -361,16 +364,16 @@ const settings = definePluginSettings({
                 }
 
                 // getting stores and loading the files into the plugin only once
-                // reduces the upload time by at least 8x
-                // tested with uploading 29 files: 4-6s -> 300-600ms
-                const results = await saveAudioFiles(filteredFiles);
+                // reduces the upload time by a lot
+                // tested with uploading 29 files (total size: 1.5 MB): 4-6s -> 300-900ms
+                const results = await AudioStore.saveAudioFiles(filteredFiles);
 
                 let successfulUploads = 0;
                 let result: string | Error;
                 for (result of results) {
                     if (typeof result !== "string") {
                         console.error("[CustomSounds] Upload error:", result);
-                        const message = result?.message || "Unknown error";
+                        const message = result.message ?? "Unknown error";
                         showToast(message.includes("too large") ? message : `Upload of "${result.name}" failed: ${message}`);
                         continue;
                     }
@@ -431,7 +434,7 @@ const settings = definePluginSettings({
                                     title: "Are you sure?",
                                     body: `This will remove ${Object.keys(files).length} file${Object.keys(files).length === 1 ? "" : "s"} imported into the plugin.`,
                                     async onConfirm() {
-                                        await clearStore();
+                                        await AudioStore.clearStore();
                                         clearCache();
                                         update();
                                         await loadFiles();
@@ -574,7 +577,7 @@ export default definePlugin({
         try {
             // Initialize max file size and cache limit from settings
             const maxSize = settings.store.maxFileSize ?? 15;
-            setMaxFileSizeMB(maxSize);
+            AudioStore.setMaxFileSizeMB(maxSize);
             updateCacheLimit(maxSize);
 
             // Optionally reset seasonal sounds to default on startup
@@ -583,7 +586,7 @@ export default definePlugin({
             }
 
             // Migrate old storage format if needed (removes redundant buffers)
-            await migrateStorage();
+            await AudioStore.migrateStorage();
 
             // Preload enabled custom sounds into memory
             await preloadDataURIs();

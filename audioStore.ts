@@ -111,14 +111,14 @@ export async function saveAudioFile(file: File): Promise<string> {
 /**
  * Saves multiple audio files.
  *
- * Returns an array, where each upload is represented with either a file ID string (if success) or `Error`.
+ * Returns an array, where each upload is represented with either a file ID string (if successful) or `Error`.
  */
 export async function saveAudioFiles(files: File[]): Promise<(string | Error)[]> {
     const results: (string | Error)[] = [];
     const audioStore: AudioStore = await getAllAudio();
     const metadataStore: MetadataStore = await getAllAudioMetadata();
 
-    for (const file of files) {
+    for (const file of files) { // processing files asyncronounsly makes no real difference
         try {
             const [id, audioData, metadata] = await processAudioFile(file);
             audioStore[id] = audioData;
@@ -139,11 +139,11 @@ async function processAudioFile(file: File): Promise<[string, StoredAudioFile, A
     const maxBytes = maxFileSizeMB * 1024 * 1024;
     if (file.size > maxBytes) {
         const fileMB = (file.size / (1024 * 1024)).toFixed(1);
-        throw new Error(`File too large (${fileMB}MB). Maximum size is ${maxFileSizeMB}MB.`);
+        throw new Error(`File "${file.name}" is too large (${fileMB}MB). Maximum size is ${maxFileSizeMB}MB.`);
     }
 
     const buffer = await file.arrayBuffer();
-    const id = await getBufferHashString(buffer);
+    const id = await getBufferHashString(buffer); // todo: doesn't it make more sense to use filenames?
     const dataUri = await generateDataURI(buffer, file.type, file.name);
 
     return [
