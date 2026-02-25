@@ -12,6 +12,7 @@ import { Heading } from "@components/Heading";
 import { Paragraph } from "@components/Paragraph";
 import { Devs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
+import { Logger } from "@utils/Logger";
 import { useForceUpdater } from "@utils/react";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
 import { saveFile } from "@utils/web";
@@ -40,6 +41,8 @@ let maxCacheSizeBytes = 100 * 1024 * 1024; // Default 100MB, updated on start
 const dataUriCache = new Map<string, string>();
 let currentCacheSize = 0;
 
+const logger = new Logger("CustomSounds");
+
 function updateCacheLimit(maxFileSizeMB: number): void {
     // calculate for 5 files at max size (accounting for base64 overhead)
     const calculatedSize = Math.round(maxFileSizeMB * CACHE_SIZE_MULTIPLIER);
@@ -50,7 +53,7 @@ function addToCache(fileId: string, dataUri: string): void {
     const uriSize = dataUri.length;
 
     if (uriSize > maxCacheSizeBytes) {
-        console.warn(`[CustomSounds] File too large to cache (${Math.round(uriSize / (1024 * 1024))}MB > ${Math.round(maxCacheSizeBytes / (1024 * 1024))}MB limit)`);
+        logger.warn(`File too large to cache (${Math.round(uriSize / (1024 * 1024))}MB > ${Math.round(maxCacheSizeBytes / (1024 * 1024))}MB limit)`);
         return;
     }
 
@@ -137,7 +140,7 @@ export async function ensureDataURICached(fileId: string): Promise<string | null
             return dataUri;
         }
     } catch (error) {
-        console.error(`[CustomSounds] Error loading audio for ${fileId}:`, error);
+        logger.error(`Error loading audio for ${fileId}:`, error);
     }
 
     return null;
@@ -160,7 +163,7 @@ function resetSeasonalOverridesToDefault(): void {
             count++;
         }
     }
-    if (count > 0) console.log(`[CustomSounds] Reset ${count} seasonal sound(s) to default`);
+    if (count > 0) logger.info(`Reset ${count} seasonal sound(s) to default`);
 }
 
 async function preloadDataURIs(): Promise<void> {
@@ -183,31 +186,24 @@ async function preloadDataURIs(): Promise<void> {
             await ensureDataURICached(fileId);
             loaded++;
         } catch (error) {
-            console.error(`[CustomSounds] Failed to preload file ${fileId}:`, error);
+            logger.error(`Failed to preload file ${fileId}:`, error);
         }
     }
 
-    console.log(`[CustomSounds] Preloaded ${loaded}/${fileIdsToPreload.size} custom sounds`);
+    logger.info(`Preloaded ${loaded}/${fileIdsToPreload.size} custom sounds`);
 }
 
 export async function debugCustomSounds(): Promise<void> {
-    console.log("[CustomSounds] === DEBUG INFO ===");
+    logger.debug("=== DEBUG INFO ===");
+    logger.debug(`Max file size: ${AudioStore.getMaxFileSizeMB()}MB`);
+    logger.debug(`Max cache size: ${Math.round(maxCacheSizeBytes / (1024 * 1024))}MB`);
 
-    // Settings info
-    console.log(`[CustomSounds] Max file size: ${AudioStore.getMaxFileSizeMB()}MB`);
-    console.log(`[CustomSounds] Max cache size: ${Math.round(maxCacheSizeBytes / (1024 * 1024))}MB`);
-
-    // Storage info
     const storageInfo = await AudioStore.getStorageInfo();
-    console.log(`[CustomSounds] Stored files: ${storageInfo.fileCount}, Total size: ${storageInfo.totalSizeKB}KB`);
+    logger.debug(`Stored files: ${storageInfo.fileCount}, Total size: ${storageInfo.totalSizeKB}KB`);
+    logger.debug(`Memory cache: ${dataUriCache.size} items, ${Math.round(currentCacheSize / 1024)}KB`);
 
-    // Memory cache info
-    console.log(`[CustomSounds] Memory cache: ${dataUriCache.size} items, ${Math.round(currentCacheSize / 1024)}KB`);
-
-    // Count enabled overrides
     let enabledCount = 0;
     let customSoundCount = 0;
-
     for (const soundType of allSoundTypes) {
         const override = getOverride(soundType.id);
         if (override.enabled) {
@@ -218,16 +214,15 @@ export async function debugCustomSounds(): Promise<void> {
         }
     }
 
-    console.log(`[CustomSounds] Enabled overrides: ${enabledCount} (${customSoundCount} custom)`);
+    logger.debug(`Enabled overrides: ${enabledCount} (${customSoundCount} custom)`);
 
-    // List all files
     const metadata = await AudioStore.getAllAudioMetadata();
-    console.log("[CustomSounds] Audio files:");
+    logger.debug("Audio files:");
     for (const [id, file] of Object.entries(metadata)) {
-        console.log(`  - ${file.name} (${Math.round(file.size / 1024)}KB) [${id}]`);
+        logger.debug(`  - ${file.name} (${Math.round(file.size / 1024)}KB) [${id}]`);
     }
 
-    console.log("[CustomSounds] === END DEBUG ===");
+    logger.debug("=== END DEBUG ===");
 
     showToast("Debug info printed in the console.");
 }
@@ -288,7 +283,7 @@ const settings = definePluginSettings({
                     setFiles(metadata);
                     setFilesLoaded(true);
                 } catch (error) {
-                    console.error("[CustomSounds] Error loading audio metadata:", error);
+                    logger.error("Error loading audio metadata:", error);
                     setFilesLoaded(true);
                 }
             }, []);
@@ -337,7 +332,7 @@ const settings = definePluginSettings({
                         setResetTrigger((prev: number) => prev + 1);
                         showToast("Settings imported successfully!");
                     } catch (error) {
-                        console.error("Error importing settings:", error);
+                        logger.error("Error importing settings:", error);
                         showToast("Error importing settings. Check console for details.");
                     }
                 };
@@ -373,7 +368,7 @@ const settings = definePluginSettings({
                 let result: string | Error;
                 for (result of results) {
                     if (typeof result !== "string") {
-                        console.error("[CustomSounds] Upload error:", result);
+                        logger.error("Upload error:", result);
                         const message = result.message ?? "Unknown error";
                         showToast(message.includes("too large") ? message : `Upload of "${result.name}" failed: ${message}`);
                         continue;
@@ -506,7 +501,7 @@ const settings = definePluginSettings({
                                                 try {
                                                     await ensureDataURICached(currentOverride.selectedFileId);
                                                 } catch (error) {
-                                                    console.error("[CustomSounds] Failed to load custom sound:", error);
+                                                    logger.error("Failed to load custom sound:", error);
                                                     showToast("Error loading custom sound file. Check console for details.");
                                                 }
                                             }
@@ -591,7 +586,7 @@ export default definePlugin({
             // Preload enabled custom sounds into memory
             await preloadDataURIs();
         } catch (error) {
-            console.error("[CustomSounds] Startup error:", error);
+            logger.error("Startup error:", error);
         }
     }
 });
