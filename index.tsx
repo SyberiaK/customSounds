@@ -364,8 +364,8 @@ const settings = definePluginSettings({
                 // tested with uploading 29 files (total size: 1.5 MB): 4-6s -> 300-900ms
                 const results = await AudioStore.saveAudioFiles(filteredFiles);
 
-                let successfulUploads = 0;
                 let result: string | Error;
+                const successfullyUploadedFiles = new Set<string>(); // using a Set in case user uploads identical files
                 for (result of results) {
                     if (typeof result !== "string") {
                         logger.error("Upload error:", result);
@@ -374,13 +374,13 @@ const settings = definePluginSettings({
                         continue;
                     }
 
-                    await ensureDataURICached(result);
-                    successfulUploads += 1;
+                    successfullyUploadedFiles.add(result);
+                    await ensureDataURICached(result); // todo: can we somehow do this in parallel without taking all the RAM?
                 }
+
                 update();
                 await loadFiles();
-
-                showToast(`Added ${successfulUploads} files.`);
+                showToast(`Added ${successfullyUploadedFiles.size} file${successfullyUploadedFiles.size === 1 ? "s" : ""}.`);
                 event.target.value = "";
             };
 
