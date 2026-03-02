@@ -214,7 +214,6 @@ const settings = definePluginSettings({
         type: OptionType.COMPONENT,
         description: "",
         component: () => {
-            const [resetTrigger, setResetTrigger] = React.useState(0);
             const [searchQuery, setSearchQuery] = React.useState("");
             const [files, setFiles] = React.useState<Record<string, AudioStore.AudioFileMetadata>>({});
             const [filesLoaded, setFilesLoaded] = React.useState(false);
@@ -244,7 +243,6 @@ const settings = definePluginSettings({
 
             const resetOverrides = () => {
                 allSoundTypes.forEach(type => setOverride(type.id, makeEmptyOverride()));
-                setResetTrigger((prev: number) => prev + 1);
                 showToast("All overrides reset successfully!");
             };
 
@@ -277,7 +275,6 @@ const settings = definePluginSettings({
                             }
                         }
 
-                        setResetTrigger((prev: number) => prev + 1);
                         showToast("Settings imported successfully!");
                     } catch (error) {
                         logger.error("Error importing settings:", error);
@@ -440,9 +437,11 @@ const settings = definePluginSettings({
                             {filteredSoundTypes.map(type => {
                                 const currentOverride = getOverride(type.id);
 
+                                if (type.id === "disconnect") logger.debug("rerendering overrides list");
+
                                 return (
                                     <SoundOverrideComponent
-                                        key={`${type.id}-${resetTrigger}`}
+                                        key={type.id}
                                         type={type}
                                         override={currentOverride}
                                         files={files}
