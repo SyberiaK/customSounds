@@ -19,6 +19,7 @@ import { saveFile } from "@utils/web";
 import { Alerts, React, showToast, TextInput } from "@webpack/common";
 
 import * as AudioStore from "./audioStore";
+import { LRU } from "./cache";
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
 import { makeEmptyOverride, SEASONAL_SOUNDS, SOUND_TYPES, SoundOverride } from "./types";
 
