@@ -66,6 +66,9 @@ export function getCustomSoundURL(id: string): string | null {
         const soundType = allSoundTypes.find(t => t.id === id);
         if (!soundType?.seasonal) return null;
 
+        // todo: is it even possible for `override.selectedSound` to be "halloween" or "winter"?
+        // todo: (which is what i assume this checks for)
+        logger.debug(`${id} reached the seasonal check? soundType: ${soundType}`);
         const seasonalId = soundType.seasonal.find(id => id.startsWith(`${override.selectedSound}_`));
         if (seasonalId && seasonalId in SEASONAL_SOUNDS)
             return SEASONAL_SOUNDS[seasonalId];
@@ -112,7 +115,6 @@ function resetSeasonalOverridesToDefault(): void {
 }
 
 async function preloadDataURIs(): Promise<void> {
-    // Collect unique file IDs that need preloading
     const fileIdsToPreload = new Set<string>();
 
     for (const soundType of allSoundTypes) {
@@ -124,7 +126,6 @@ async function preloadDataURIs(): Promise<void> {
 
     if (fileIdsToPreload.size === 0) return;
 
-    // Preload each unique file (avoids duplicate loads if same file used for multiple sounds)
     let loaded = 0;
     for (const fileId of fileIdsToPreload) {
         try {
@@ -139,13 +140,13 @@ async function preloadDataURIs(): Promise<void> {
 }
 
 export async function debugCustomSounds(): Promise<void> {
-    logger.debug("=== DEBUG INFO ===");
-    logger.debug(`Max file size: ${AudioStore.getMaxFileSizeMB()}MB`);
-    logger.debug(`Max cache size: ${Math.round(maxCacheSizeBytes / (1024 * 1024))}MB`);
+    logger.info("=== DEBUG INFO ===");
+    logger.info(`Max file size: ${AudioStore.getMaxFileSizeMB()}MB`);
+    logger.info(`Max cache size: ${Math.round(dataUriCache.maxSize() / (1024 * 1024))}MB`);
 
     const storageInfo = await AudioStore.getStorageInfo();
-    logger.debug(`Stored files: ${storageInfo.fileCount}, Total size: ${storageInfo.totalSizeKB}KB`);
-    logger.debug(`Memory cache: ${dataUriCache.size} items, ${Math.round(currentCacheSize / 1024)}KB`);
+    logger.info(`Stored files: ${storageInfo.fileCount}, Total size: ${storageInfo.totalSizeKB}KB`);
+    logger.info(`Memory cache: ${dataUriCache.size()} items, ${Math.round(dataUriCache.size() / 1024)}KB`);
 
     let enabledCount = 0;
     let customSoundCount = 0;
@@ -159,17 +160,15 @@ export async function debugCustomSounds(): Promise<void> {
         }
     }
 
-    logger.debug(`Enabled overrides: ${enabledCount} (${customSoundCount} custom)`);
+    logger.info(`Enabled overrides: ${enabledCount} (${customSoundCount} custom)`);
 
     const metadata = await AudioStore.getAllAudioMetadata();
-    logger.debug("Audio files:");
+    logger.info("Audio files:");
     for (const [id, file] of Object.entries(metadata)) {
-        logger.debug(`  - ${file.name} (${Math.round(file.size / 1024)}KB) [${id}]`);
+        logger.info(`  - ${file.name} (${Math.round(file.size / 1024)}KB) [${id}]`);
     }
 
-    logger.debug("=== END DEBUG ===");
-
-    showToast("Debug info printed in the console.");
+    logger.info("=== END DEBUG ===");
 }
 
 const soundSettings = Object.fromEntries(
@@ -184,7 +183,6 @@ const soundSettings = Object.fromEntries(
     ])
 );
 
-// File size options (in MB)
 const fileSizeOptions = [
     { value: 5, label: "5 MB (Conservative)" },
     { value: 15, label: "15 MB (Default)" },
@@ -346,14 +344,14 @@ const settings = definePluginSettings({
                     __note: "Audio files are not included in exports and will need to be re-added before import"
                 };
 
+                showToast(`Exporting ${overrides.length} settings... (Audio files are not included!)`);
+
                 const file = new File(
                     [JSON.stringify(exportPayload, null, 2)],
                     "customSounds-settings.json",
                     { type: "application/json" }
                 );
                 saveFile(file);
-
-                showToast(`Exported ${overrides.length} settings. (Audio files are not included!)`);
             };
 
             const filteredSoundTypes = allSoundTypes.filter(type =>
@@ -392,7 +390,12 @@ const settings = definePluginSettings({
                             }}
                         >
                             Remove All</Button>
-                        <Button variant="overlayPrimary" onClick={debugCustomSounds}>Debug</Button>
+                        <Button variant="overlayPrimary" onClick={() => {
+                            debugCustomSounds();
+                            showToast("Debug info printed in the console.");
+                        }}
+                        >
+                            Debug</Button>
                         <input
                             ref={audioFilesInputRef}
                             type="file"
