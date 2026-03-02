@@ -70,8 +70,10 @@ export function getCustomSoundURL(id: string): string | null {
         // todo: (which is what i assume this checks for)
         logger.debug(`${id} reached the seasonal check? soundType: ${soundType}`);
         const seasonalId = soundType.seasonal.find(id => id.startsWith(`${override.selectedSound}_`));
-        if (seasonalId && seasonalId in SEASONAL_SOUNDS)
+        if (seasonalId && seasonalId in SEASONAL_SOUNDS) {
+            logger.debug(`${id} passed the seasonal check?? soundType: ${soundType}, seasonalId: ${seasonalId}`);
             return SEASONAL_SOUNDS[seasonalId];
+        }
     }
 
     return null;
