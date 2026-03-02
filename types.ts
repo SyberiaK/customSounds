@@ -70,6 +70,8 @@ export const SOUND_TYPES: readonly SoundType[] = [
             "call_ringing_snowsgiving"
         ]
     },
+    { name: "Camera Off", id: "camera_off" },
+    { name: "Camera On", id: "camera_on" },
     { name: "Clip Error", id: "clip_error" },
     { name: "Clip Save", id: "clip_save" },
     { name: "Connect (derived from User Join)", id: "connect", derived: "user_join" },
@@ -114,6 +116,11 @@ export const SOUND_TYPES: readonly SoundType[] = [
     { name: "User Leave", id: "user_leave", seasonal: ["halloween_user_leave", "winter_user_leave"] },
     { name: "User Moved", id: "user_moved" },
     { name: "Vibing Wumpus", id: "vibing_wumpus" },
+    { name: "Voice Filter off (unused?)", id: "voice_filter_off" },
+    { name: "Voice Filter on (unused?)", id: "voice_filter_on" },
+    { name: "Voice Filter swap (unused?)", id: "voice_filter_swap" },
+    { name: "Voice Filter loopback off (unused?)", id: "voice_filter_loopback_off" },
+    { name: "Voice Filter loopback on (unused?)", id: "voice_filter_loopback_on" },
 ] as const;
 
 export function makeEmptyOverride(): SoundOverride {
