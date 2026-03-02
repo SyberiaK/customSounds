@@ -29,64 +29,8 @@ const cl = classNameFactory("vc-custom-sounds-");
 
 const allSoundTypes = SOUND_TYPES || [];
 
-const MIN_CACHE_SIZE_MB_CAP = 5;
-const MAX_CACHE_SIZE_MB_CAP = 500;
-
-// LRU-style cache with dynamic size limit based on max file size setting
-const MAX_FILES_CACHED_AT_MAX_SIZE = 5;
-const BASE64_OVERHEAD = 1.37;
-const CACHE_SIZE_MULTIPLIER = BASE64_OVERHEAD * MAX_FILES_CACHED_AT_MAX_SIZE;
-
-let maxCacheSizeBytes = 100 * 1024 * 1024; // Default 100MB, updated on start
-const dataUriCache = new Map<string, string>();
-let currentCacheSize = 0;
-
+const dataUriCache = new LRU();
 const logger = new Logger("CustomSounds");
-
-function updateCacheLimit(maxFileSizeMB: number): void {
-    // calculate for 5 files at max size (accounting for base64 overhead)
-    const calculatedSize = Math.round(maxFileSizeMB * CACHE_SIZE_MULTIPLIER);
-    maxCacheSizeBytes = Math.min(Math.max(calculatedSize, MIN_CACHE_SIZE_MB_CAP), MAX_CACHE_SIZE_MB_CAP) * 1024 * 1024;
-}
-
-function addToCache(fileId: string, dataUri: string): void {
-    const uriSize = dataUri.length;
-
-    if (uriSize > maxCacheSizeBytes) {
-        logger.warn(`File too large to cache (${Math.round(uriSize / (1024 * 1024))}MB > ${Math.round(maxCacheSizeBytes / (1024 * 1024))}MB limit)`);
-        return;
-    }
-
-    // Evict oldest entries if needed (maintain insertion order)
-    while (currentCacheSize + uriSize > maxCacheSizeBytes && dataUriCache.size > 0) {
-        const oldestKey = dataUriCache.keys().next().value;
-
-        // todo: isn't `dataUriCache.size > 0` there to ensure at least one key is present?
-        if (oldestKey) {
-            const oldestSize = dataUriCache.get(oldestKey)?.length || 0;
-            dataUriCache.delete(oldestKey);
-            currentCacheSize -= oldestSize;
-        }
-    }
-
-    dataUriCache.set(fileId, dataUri);
-    currentCacheSize += uriSize;
-}
-
-function getFromCache(fileId: string): string | undefined {
-    const dataUri = dataUriCache.get(fileId);
-    if (dataUri) {
-        // Move to end (most recently used) by re-inserting
-        dataUriCache.delete(fileId);
-        dataUriCache.set(fileId, dataUri);
-    }
-    return dataUri;
-}
-
-function clearCache(): void {
-    dataUriCache.clear();
-    currentCacheSize = 0;
-}
 
 function getOverride(id: string): SoundOverride {
     const stored = settings.store[id];
@@ -112,7 +56,7 @@ export function getCustomSoundURL(id: string): string | null {
 
     if (override.selectedSound === "custom" && override.selectedFileId) {
         // null => cache miss - shouldn't happen if preloading worked, but don't block
-        return getFromCache(override.selectedFileId) ?? null;
+        return dataUriCache.get(override.selectedFileId) ?? null;
     }
 
     if (override.selectedSound !== "default" && override.selectedSound !== "custom") {
@@ -130,13 +74,13 @@ export function getCustomSoundURL(id: string): string | null {
 }
 
 export async function ensureDataURICached(fileId: string): Promise<string | null> {
-    const cached = getFromCache(fileId);
+    const cached = dataUriCache.get(fileId);
     if (cached) return cached;
 
     try {
         const dataUri = await AudioStore.getAudioDataURI(fileId);
         if (dataUri) {
-            addToCache(fileId, dataUri);
+            dataUriCache.set(fileId, dataUri);
             return dataUri;
         }
     } catch (error) {
@@ -257,7 +201,7 @@ const settings = definePluginSettings({
         default: 15,
         onChange: (value: number) => {
             AudioStore.setMaxFileSizeMB(value);
-            updateCacheLimit(value);
+            dataUriCache.setSizeLimit(value);
         }
     },
     resetSeasonalOnStartup: {
@@ -430,7 +374,7 @@ const settings = definePluginSettings({
                                     body: `This will remove ${Object.keys(files).length} file${Object.keys(files).length === 1 ? "" : "s"} imported into the plugin.`,
                                     async onConfirm() {
                                         await AudioStore.clearStore();
-                                        clearCache();
+                                        dataUriCache.clear();
                                         update();
                                         await loadFiles();
                                         allSoundTypes.forEach(type => {
@@ -573,7 +517,7 @@ export default definePlugin({
             // Initialize max file size and cache limit from settings
             const maxSize = settings.store.maxFileSize ?? 15;
             AudioStore.setMaxFileSizeMB(maxSize);
-            updateCacheLimit(maxSize);
+            dataUriCache.setSizeLimit(maxSize);
 
             // Optionally reset seasonal sounds to default on startup
             if (settings.store.resetSeasonalOnStartup) {
