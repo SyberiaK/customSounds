@@ -259,8 +259,9 @@ const settings = definePluginSettings({
 
                         if (imported.overrides && Array.isArray(imported.overrides)) {
                             const empty = makeEmptyOverride();
-                            imported.overrides.forEach((setting: any) => {
-                                if (!setting.id) return;
+
+                            for (const setting of imported.overrides) {
+                                if (!setting.id) continue;
 
                                 const override: SoundOverride = {
                                     enabled: setting.enabled ?? empty.enabled,
@@ -269,7 +270,9 @@ const settings = definePluginSettings({
                                     volume: setting.volume ?? empty.volume,
                                 };
                                 setOverride(setting.id, override);
-                            });
+
+                                if (setting.selectedFileId) await ensureDataURICached(setting.selectedFileId);
+                            }
                         }
 
                         setResetTrigger((prev: number) => prev + 1);
