@@ -8,12 +8,12 @@ export interface SoundType {
     name: string;
     id: string;
     seasonal?: string[];
-    derived?: string; // any sound with this is implemented by the plugin
+    derived?: string; // any sound with this is implemented by the plugin (only one so far)
 }
 
 export interface SoundOverride {
     enabled: boolean;
-    selectedSound: "default" | "custom" | (string & {});
+    selectedSound: "default" | "custom" | (string & {}); // `keyof typeof SEASONAL_SOUNDS`?
     volume: number;
     selectedFileId?: string;
 }
@@ -48,7 +48,7 @@ export const SEASONAL_SOUNDS = {
     "winter_user_join": "https://canary.discord.com/assets/badc42c2a9063b4a962c.mp3",
     "halloween_user_leave": "https://canary.discord.com/assets/f407ad88a1dc40541769.mp3",
     "winter_user_leave": "https://canary.discord.com/assets/ec3d9eaea30b33e16da6.mp3"
-} as const;
+} as const; // for some reason discord also bundles "halloween_defean" and "halloween_undefean" which are exactly same as the sane named ones
 
 export const SOUND_TYPES: readonly SoundType[] = [
     { name: "Activity End", id: "activity_end" },
