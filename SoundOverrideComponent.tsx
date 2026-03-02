@@ -15,8 +15,7 @@ import { makeRange } from "@utils/types";
 import { findByCodeLazy } from "@webpack";
 import { React, Select, showToast, Slider } from "@webpack/common";
 
-import { AudioFileMetadata, deleteAudio } from "./audioStore";
-import { ensureDataURICached } from "./index";
+import * as AudioStore from "./audioStore";
 import { SoundOverride, SoundPlayer, SoundType } from "./types";
 
 const cl = classNameFactory("vc-custom-sounds-");
@@ -29,7 +28,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
     type: SoundType;
     override: SoundOverride;
     onChange: () => Promise<void>;
-    files: Record<string, AudioFileMetadata>;
+    files: Record<string, AudioStore.AudioFileMetadata>;
     onFilesChange: () => void;
 }) {
     const update = useForceUpdater();
@@ -72,7 +71,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
         }
 
         try {
-            const dataUri = await ensureDataURICached(selectedFileId);
+            const dataUri = await AudioStore.getAudioDataURI(selectedFileId);
 
             if (!dataUri || !dataUri.startsWith("data:audio/")) {
                 showToast("No custom sound file available for preview");
@@ -121,7 +120,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
 
     const deleteFile = async (id: string) => {
         try {
-            await deleteAudio(id);
+            await AudioStore.deleteAudio(id);
 
             if (override.selectedFileId === id) {
                 override.selectedFileId = undefined;
@@ -149,17 +148,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                 value={override.enabled || false}
                 onChange={async val => {
                     override.enabled = val;
-
-                    if (val && override.selectedSound === "custom" && override.selectedFileId) {
-                        try {
-                            await ensureDataURICached(override.selectedFileId);
-                        } catch (error) {
-                            console.error("[CustomSounds] Failed to load custom sound:", error);
-                            showToast("Error loading custom sound file. Check console for details.");
-                        }
-                    }
-
-                    await saveAndNotify();
+                    saveAndNotify();
                 }}
                 className={Margins.bottom16}
                 hideBorder
@@ -204,17 +193,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                         isSelected={v => v === override.selectedSound}
                         select={async v => {
                             override.selectedSound = v;
-
-                            if (v === "custom" && override.selectedFileId) {
-                                try {
-                                    await ensureDataURICached(override.selectedFileId);
-                                } catch (error) {
-                                    console.error(`[CustomSounds] Failed to cache data URI for ${type.id}:`, error);
-                                    showToast("Error loading custom sound file");
-                                }
-                            }
-
-                            await saveAndNotify();
+                            saveAndNotify();
                         }}
                         serialize={opt => opt.value}
                         className={Margins.bottom16}
@@ -230,14 +209,8 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                                 ]}
                                 isSelected={v => v === (override.selectedFileId || "")}
                                 select={async id => {
-                                    if (!id) {
-                                        override.selectedFileId = undefined;
-                                    } else {
-                                        override.selectedFileId = id;
-                                        await ensureDataURICached(id);
-                                    }
-
-                                    await saveAndNotify();
+                                    override.selectedFileId = id || undefined;
+                                    saveAndNotify();
                                 }}
                                 serialize={opt => opt.value}
                                 className={Margins.bottom8}
