@@ -197,7 +197,7 @@ const settings = definePluginSettings({
     ...soundSettings,
     maxFileSize: {
         type: OptionType.SELECT,
-        description: "Maximum file size for custom audio uploads. Larger sizes use more memory, take more time to process and may cause performance issues or crashes on lower-end devices. Increase at your own risk!",
+        description: "Larger uploads use more memory, take more time to process and may cause performance issues or crashes on lower-end devices. Increase at your own risk!",
         options: fileSizeOptions,
         default: 15,
         onChange: (value: number) => {
@@ -205,9 +205,9 @@ const settings = definePluginSettings({
             dataUriCache.setSizeLimit(value);
         }
     },
-    resetSeasonalOnStartup: {
+    resetSeasonalSoundsOnStartup: {
         type: OptionType.BOOLEAN,
-        description: "Reset seasonal sounds to default on startup. Any sound set to a Halloween/Winter variant will be changed back to Default when the plugin loads.",
+        description: "Any sound set to a Halloween/Winter variant will be changed back to Default when the plugin loads.",
         default: true
     },
     overrides: {
@@ -420,7 +420,7 @@ const settings = definePluginSettings({
                             onChange={handleSettingsUpload}
                         />
                     </div>
-
+                    <Paragraph>NOTE: before importing settings, make sure to add required audio files by clicking "Add" button.</Paragraph>
                     <div className={cl("search")}>
                         <Heading>Search Sounds</Heading>
                         <TextInput
@@ -528,7 +528,7 @@ export default definePlugin({
             dataUriCache.setSizeLimit(maxSize);
 
             // Optionally reset seasonal sounds to default on startup
-            if (settings.store.resetSeasonalOnStartup) {
+            if (settings.store.resetSeasonalSoundsOnStartup) {
                 resetSeasonalOverridesToDefault();
             }
 
