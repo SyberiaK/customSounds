@@ -246,6 +246,46 @@ const settings = definePluginSettings({
                 showToast("All overrides reset successfully!");
             };
 
+            const uploadFiles = async (event: React.ChangeEvent<HTMLInputElement>) => {
+                const { files } = event.target;
+                if (!files) return;
+
+                showToast(files.length > 1 ? `Uploading ${files.length} files...` : "Uploading file...");
+
+                const filteredFiles: File[] = [];
+                for (const file of files) {
+                    if (!file) continue;
+
+                    const fileExtension = file.name.split(".").pop()?.toLowerCase();
+                    if (!fileExtension || !AUDIO_EXTENSIONS.includes(fileExtension)) {
+                        showToast(`Invalid file type of "${file.name}". Please upload only audio files (${audioExtensionsString}).`);
+                        continue;
+                    }
+                    filteredFiles.push(file);
+                }
+
+                const results = await AudioStore.saveAudioFiles(filteredFiles);
+
+                let result: string | Error;
+                const successfullyUploadedFiles = new Set<string>(); // using a Set in case user uploads identical files
+                for (result of results) {
+                    if (typeof result !== "string") {
+                        logger.error("Upload error:", result);
+                        const message = result.message ?? "Unknown error";
+                        showToast(message.includes("too large") ? message : `Upload of "${result.name}" failed: ${message}`);
+                        continue;
+                    }
+
+                    successfullyUploadedFiles.add(result);
+                    await ensureDataURICached(result); // todo: can we somehow do this in parallel without taking all the RAM?
+                }
+
+                update();
+                await loadFiles();
+                showToast(`Added ${successfullyUploadedFiles.size} file${successfullyUploadedFiles.size === 1 ? "s" : ""}.`);
+                event.target.value = "";
+            };
+
             const handleSettingsUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
                 const file = event.target.files?.[0];
 
@@ -283,49 +323,6 @@ const settings = definePluginSettings({
                 };
 
                 reader.readAsText(file);
-                event.target.value = "";
-            };
-
-            const uploadFiles = async (event: React.ChangeEvent<HTMLInputElement>) => {
-                const { files } = event.target;
-                if (!files) return;
-
-                showToast(files.length > 1 ? `Uploading ${files.length} files...` : "Uploading file...");
-
-                const filteredFiles: File[] = [];
-                for (const file of files) {
-                    if (!file) continue;
-
-                    const fileExtension = file.name.split(".").pop()?.toLowerCase();
-                    if (!fileExtension || !AUDIO_EXTENSIONS.includes(fileExtension)) {
-                        showToast(`Invalid file type of "${file.name}". Please upload only audio files (${audioExtensionsString}).`);
-                        continue;
-                    }
-                    filteredFiles.push(file);
-                }
-
-                // getting stores and loading the files into the plugin only once
-                // reduces the upload time by a lot
-                // tested with uploading 29 files (total size: 1.5 MB): 4-6s -> 300-900ms
-                const results = await AudioStore.saveAudioFiles(filteredFiles);
-
-                let result: string | Error;
-                const successfullyUploadedFiles = new Set<string>(); // using a Set in case user uploads identical files
-                for (result of results) {
-                    if (typeof result !== "string") {
-                        logger.error("Upload error:", result);
-                        const message = result.message ?? "Unknown error";
-                        showToast(message.includes("too large") ? message : `Upload of "${result.name}" failed: ${message}`);
-                        continue;
-                    }
-
-                    successfullyUploadedFiles.add(result);
-                    await ensureDataURICached(result); // todo: can we somehow do this in parallel without taking all the RAM?
-                }
-
-                update();
-                await loadFiles();
-                showToast(`Added ${successfullyUploadedFiles.size} file${successfullyUploadedFiles.size === 1 ? "s" : ""}.`);
                 event.target.value = "";
             };
 
