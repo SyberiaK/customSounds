@@ -25,7 +25,8 @@ import { SoundOverrideComponent } from "./SoundOverrideComponent";
 import { makeEmptyOverride, SEASONAL_SOUNDS, SOUND_TYPES, SoundOverride } from "./types";
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "m4a", "aac", "flac", "webm", "wma", "mp4"];
-const audioExtensionsString = AUDIO_EXTENSIONS.map(v => `.${v}`).join(", ");
+const audioExtensionsString = AUDIO_EXTENSIONS.map(v => `.${v}`).join(",");
+const audioExtensionsFormattedString = AUDIO_EXTENSIONS.map(v => `.${v}`).join(", ");
 
 const cl = classNameFactory("vc-custom-sounds-");
 
@@ -259,7 +260,7 @@ const settings = definePluginSettings({
 
                     const fileExtension = file.name.split(".").pop()?.toLowerCase();
                     if (!fileExtension || !AUDIO_EXTENSIONS.includes(fileExtension)) {
-                        showToast(`Invalid file type of "${file.name}". Please upload only audio files (${audioExtensionsString}).`);
+                        showToast(`Invalid file type of "${file.name}". Please upload only audio files (${audioExtensionsFormattedString}).`);
                         continue;
                     }
                     filteredFiles.push(file);
@@ -399,7 +400,7 @@ const settings = definePluginSettings({
                         <input
                             ref={audioFilesInputRef}
                             type="file"
-                            accept=".mp3,.wav,.ogg,.m4a,.flac,.aac,.webm,.wma,.mp4"
+                            accept={audioExtensionsString}
                             multiple
                             style={{ display: "none" }}
                             onChange={uploadFiles}
