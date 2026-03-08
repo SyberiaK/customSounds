@@ -13,6 +13,7 @@ import { Paragraph } from "@components/Paragraph";
 import { Devs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
 import { Logger } from "@utils/Logger";
+import { Margins } from "@utils/margins";
 import { useForceUpdater } from "@utils/react";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
 import { saveFile } from "@utils/web";
@@ -417,7 +418,7 @@ const settings = definePluginSettings({
                             onChange={handleSettingsUpload}
                         />
                     </div>
-                    <Paragraph>NOTE: before importing settings, make sure to add required audio files by clicking "Add" button.</Paragraph>
+                    <Paragraph className={Margins.bottom16}>NOTE: before importing settings, make sure to add required audio files by clicking "Add" button.</Paragraph>
                     <div className={cl("search")}>
                         <Heading>Search Sounds</Heading>
                         <TextInput
