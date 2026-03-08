@@ -313,7 +313,19 @@ const settings = definePluginSettings({
                                 };
                                 setOverride(setting.id, override);
 
-                                if (setting.selectedFileId) await ensureDataURICached(setting.selectedFileId);
+                                if (!setting.selectedFileId) continue;
+                                const result = await ensureDataURICached(setting.selectedFileId);
+                                if (result) continue;
+
+                                Alerts.show({
+                                    title: "Audio file not found",
+                                    body: `Seems like a custom sound file for "${setting.id}" is missing.\nPerhaps you forgot to add it (and potentially some other audio files).\n\nDo you want to add missing files?`,
+                                    async onConfirm() {
+                                        audioFilesInputRef.current?.click();
+                                    },
+                                    confirmText: "Yes",
+                                    cancelText: "No"
+                                });
                             }
                         }
 
@@ -362,7 +374,7 @@ const settings = definePluginSettings({
 
             return (
                 <div>
-                    <Heading>Sounds</Heading>
+                    <Heading>Custom Sounds</Heading>
                     <div className={cl("buttons")}>
                         <Button variant="positive" onClick={() => audioFilesInputRef.current?.click()}>Add</Button>
                         <Button
