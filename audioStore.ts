@@ -5,6 +5,7 @@
  */
 
 import { get, set } from "@api/DataStore";
+import { Logger } from "@utils/Logger";
 
 const STORAGE_KEY = "ScattrdCustomSounds";
 const METADATA_KEY = "ScattrdCustomSounds_Metadata";
@@ -15,7 +16,7 @@ const DEFAULT_MAX_FILE_SIZE_MB = 15;
 // Configurable max file size (set by plugin settings)
 let maxFileSizeMB = DEFAULT_MAX_FILE_SIZE_MB;
 
-const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-5][0-9a-f]{3}-[089ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const logger = new Logger("CustomSounds");
 
 export function setMaxFileSizeMB(sizeMB: number): void {
     maxFileSizeMB = sizeMB;
@@ -75,17 +76,6 @@ async function setAudioStore(new_: AudioStore): Promise<void> {
     await set(STORAGE_KEY, new_);
 }
 
-async function getBufferHashString(buffer: ArrayBuffer): Promise<string> {
-    const hashBuffer: ArrayBuffer = await crypto.subtle.digest("SHA-256", buffer);
-
-    const hashView = new Uint8Array(hashBuffer);
-
-    const hashString = Array.from(hashView)
-        .map(b => b.toString(16).padStart(2, "0"))
-        .join("");
-    return hashString;
-}
-
 /**
  * Saves an audio file.
  *
@@ -143,7 +133,7 @@ async function processAudioFile(file: File): Promise<[string, StoredAudioFile, A
     }
 
     const buffer = await file.arrayBuffer();
-    const id = await getBufferHashString(buffer); // todo: doesn't it make more sense to use filenames?
+    const id = file.name;
     const dataUri = await generateDataURI(buffer, file.type, file.name);
 
     return [
@@ -190,10 +180,6 @@ export async function clearStore(): Promise<void> {
     await setMetadataStore({});
 }
 
-function isUUIDLike(s: string): boolean {
-    return UUID_REGEX.test(s);
-}
-
 /**
  * Migrates old storage format to new format (run once on startup).
  */
@@ -210,23 +196,25 @@ export async function migrateStorage(): Promise<boolean> {
         if (typeof file !== "object") continue;
 
         if ("buffer" in file ||
-            ("id" in file && isUUIDLike(file.id))) {
+            ("id" in file && file.id !== file.name)) {
             needsMigration = true;
             break;
         }
     }
 
-    // Check if metadata store exists
     const metadataStore = await get(METADATA_KEY);
     if (!metadataStore && Object.keys(audioStore).length > 0) {
         needsMetadataRebuild = true;
     }
 
+    // this migration section is half arsed since it does migrate sounds
+    // but still breaks the imports if the id is changed
     if (needsMigration) {
-        console.log("[CustomSounds] Migrating storage to remove redundant buffers and fix IDs...");
+        logger.info("Migrating storage to remove redundant buffers and fix IDs...");
         const newAudioStore: AudioStore = {};
 
-        for (const [file] of Object.values(audioStore)) {
+        for (const file of Object.values(audioStore)) {
+            logger.info(file);
             if (!file || typeof file !== "object") continue;
 
             // If it has dataUri, keep it; if only buffer, generate dataUri
@@ -237,8 +225,7 @@ export async function migrateStorage(): Promise<boolean> {
 
             if (!dataUri) continue;
 
-            // Migrate from random UUIDs to file hashes to make imports actually useful
-            const new_id = await getBufferHashString(file.buffer);
+            const new_id = file.name;
 
             newAudioStore[new_id] = {
                 id: new_id,
@@ -250,11 +237,11 @@ export async function migrateStorage(): Promise<boolean> {
 
         await setAudioStore(newAudioStore);
         needsMetadataRebuild = true;
-        console.log("[CustomSounds] Storage migration complete");
+        logger.info("Storage migration complete.");
     }
 
     if (needsMetadataRebuild) {
-        console.log("[CustomSounds] Rebuilding metadata index...");
+        logger.info("Rebuilding metadata index...");
         const currentAudioStore = await getAllAudio();
         const newMetadataStore: MetadataStore = {};
 
@@ -268,7 +255,7 @@ export async function migrateStorage(): Promise<boolean> {
         }
 
         await setMetadataStore(newMetadataStore);
-        console.log("[CustomSounds] Metadata rebuild complete");
+        logger.info("Metadata rebuild complete");
     }
 
     return needsMigration || needsMetadataRebuild;
