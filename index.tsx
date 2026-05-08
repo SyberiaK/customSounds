@@ -22,7 +22,7 @@ import { Alerts, React, showToast, TextInput, UserStore } from "@webpack/common"
 import * as AudioStore from "./audioStore";
 import { LRU } from "./cache";
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
-import { makeEmptyOverride, SEASONAL_SOUNDS, SOUND_TYPES, SoundOverride } from "./types";
+import { makeEmptyOverride, SEASONAL_SOUNDS, SettingsExport, SOUND_TYPES, SoundOverride } from "./types";
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "m4a", "aac", "flac", "webm", "wma", "mp4"];
 const audioExtensionsString = AUDIO_EXTENSIONS.map(v => `.${v}`).join(",");
@@ -297,11 +297,11 @@ const settings = definePluginSettings({
                 reader.onload = async (e: ProgressEvent<FileReader>) => {
                     try {
                         resetOverrides();
-                        const imported = JSON.parse(e.target?.result as string);
+                        const imported: SettingsExport = JSON.parse(e.target?.result as string);
 
+                        const empty = makeEmptyOverride();
+                        const filesMissing: ({ id: string; } & SoundOverride)[] = [];
                         if (imported.overrides && Array.isArray(imported.overrides)) {
-                            const empty = makeEmptyOverride();
-
                             for (const setting of imported.overrides) {
                                 if (!setting.id) continue;
 
@@ -314,19 +314,33 @@ const settings = definePluginSettings({
                                 setOverride(setting.id, override);
 
                                 if (!setting.selectedFileId) continue;
-                                const result = await ensureDataURICached(setting.selectedFileId);
-                                if (result) continue;
+                                if (!files[setting.selectedFileId]) filesMissing.push(setting);
 
-                                Alerts.show({
-                                    title: "Audio file not found",
-                                    body: `Seems like a custom sound file for "${setting.id}" is missing.\nPerhaps you forgot to add it (and potentially some other audio files).\n\nDo you want to add missing files?`,
-                                    async onConfirm() {
-                                        audioFilesInputRef.current?.click();
-                                    },
-                                    confirmText: "Yes",
-                                    cancelText: "No"
-                                });
+                                await ensureDataURICached(setting.selectedFileId);
                             }
+                        }
+
+                        if (filesMissing.length !== 0) {
+                            Alerts.show({
+                                title: "Audio files not found",
+                                body: `Seems like some custom audio files are missing: ${filesMissing.map(setting => setting.selectedFileId).join(", ")}. Do you want to add missing files?`,
+                                async onConfirm() {
+                                    audioFilesInputRef.current?.click();
+                                },
+                                async onCancel() {
+                                    filesMissing.forEach(setting => {
+                                        const override: SoundOverride = {
+                                            enabled: setting.enabled,
+                                            selectedSound: setting.selectedSound,
+                                            selectedFileId: empty.selectedFileId,
+                                            volume: setting.volume,
+                                        };
+                                        setOverride(setting.id, override);
+                                    });
+                                },
+                                confirmText: "Yes",
+                                cancelText: "No"
+                            });
                         }
 
                         showToast("Settings imported successfully!");
@@ -352,9 +366,9 @@ const settings = definePluginSettings({
                     };
                 }).filter(o => o.enabled || o.selectedSound !== "default");
 
-                const exportPayload = {
-                    overrides,
-                    __note: "Audio files are not included in exports and will need to be re-added before import"
+                const exportPayload: SettingsExport = {
+                    __note: "Audio files are not included in exports and will need to be re-added before import",
+                    overrides
                 };
 
                 showToast(`Exporting ${overrides.length} settings... (Audio files are not included!)`);
@@ -451,6 +465,12 @@ const settings = definePluginSettings({
                         <div className={cl("sounds-list")}>
                             {filteredSoundTypes.map(type => {
                                 const currentOverride = getOverride(type.id);
+
+                                if (currentOverride.selectedFileId &&
+                                    !files[currentOverride.selectedFileId]) {
+                                    currentOverride.selectedFileId = undefined;
+                                    // setOverride(type.id, currentOverride);  // breaks "file missing" prompt
+                                }
 
                                 if (type.id === "disconnect") logger.debug("rerendering overrides list");
 
