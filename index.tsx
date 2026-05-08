@@ -245,7 +245,6 @@ const settings = definePluginSettings({
 
             const resetOverrides = () => {
                 allSoundTypes.forEach(type => setOverride(type.id, makeEmptyOverride()));
-                showToast("All overrides reset successfully!");
             };
 
             const uploadFiles = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -586,12 +585,10 @@ export default definePlugin({
 
     async start() {
         try {
-            // Initialize max file size and cache limit from settings
             const maxSize = settings.store.maxFileSize ?? 15;
             AudioStore.setMaxFileSizeMB(maxSize);
             dataUriCache.setSizeLimit(maxSize);
 
-            // Optionally reset seasonal sounds to default on startup
             if (settings.store.resetSeasonalSoundsOnStartup) {
                 resetSeasonalOverridesToDefault();
             }

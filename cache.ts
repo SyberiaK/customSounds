@@ -15,7 +15,7 @@ const MAX_CACHE_SIZE_MB_CAP = 500;
  * LRU-style cache with dynamic size limit based on max file size setting
  */
 export class LRU {
-    cache: Map<string, string> = new Map(); // might make this generic but ehh
+    cache: Map<string, string>; // might make this generic but ehh
     private _size: number = 0;
     private _maxSize: number = 0;
 
