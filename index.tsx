@@ -249,13 +249,13 @@ const settings = definePluginSettings({
             };
 
             const uploadFiles = async (event: React.ChangeEvent<HTMLInputElement>) => {
-                const { files } = event.target;
-                if (!files) return;
+                const selectedFiles = event.target.files;
+                if (!selectedFiles) return;
 
-                showToast(files.length > 1 ? `Uploading ${files.length} files...` : "Uploading file...");
+                showToast(selectedFiles.length > 1 ? `Uploading ${selectedFiles.length} files...` : "Uploading file...");
 
                 const filteredFiles: File[] = [];
-                for (const file of files) {
+                for (const file of selectedFiles) {
                     if (!file) continue;
 
                     const fileExtension = file.name.split(".").pop()?.toLowerCase();
@@ -266,25 +266,39 @@ const settings = definePluginSettings({
                     filteredFiles.push(file);
                 }
 
-                const results = await AudioStore.saveAudioFiles(filteredFiles);
+                const audioDataToSave: [AudioStore.StoredAudioFile, AudioStore.AudioFileMetadata][] = [];
+                for (const file of filteredFiles) {
+                    try {
+                        const [data, metadata] = await AudioStore.processAudioFile(file);
 
-                let result: string | Error;
-                const successfullyUploadedFiles = new Set<string>(); // using a Set in case user uploads identical files
-                for (result of results) {
-                    if (typeof result !== "string") {
-                        logger.error("Upload error:", result);
-                        const message = result.message ?? "Unknown error";
-                        showToast(message.includes("too large") ? message : `Upload of "${result.name}" failed: ${message}`);
+                        if (files[metadata.id]) {
+                            const doSkip = await Alerts.confirm({
+                                title: "The file already exists",
+                                body: `You already have a file named "${metadata.name}" uploaded.`,
+                                confirmText: "Skip",
+                                cancelText: "Replace"
+                            });
+
+                            if (doSkip) continue;
+
+                            audioDataToSave.push([data, metadata]);
+                        }
+                    } catch (error: any) {
+                        logger.error("Upload error:", error);
+                        const message = error.message ?? "Unknown error";
+                        showToast(message.includes("too large") ? message : `Upload of "${error.name}" failed: ${message}`);
                         continue;
                     }
-
-                    successfullyUploadedFiles.add(result);
-                    await ensureDataURICached(result); // todo: can we somehow do this in parallel without taking all the RAM?
                 }
+
+                await AudioStore.saveAudioData(audioDataToSave);
+
+                // todo: can we somehow do this in parallel without taking all the RAM?
+                for (const [_, metadata] of audioDataToSave) await ensureDataURICached(metadata.id);
 
                 update();
                 await loadFiles();
-                showToast(`Added ${successfullyUploadedFiles.size} file${successfullyUploadedFiles.size === 1 ? "s" : ""}.`);
+                showToast(`Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`);
                 event.target.value = "";
             };
 

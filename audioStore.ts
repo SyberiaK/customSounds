@@ -76,56 +76,20 @@ async function setAudioStore(new_: AudioStore): Promise<void> {
     await set(STORAGE_KEY, new_);
 }
 
-/**
- * Saves an audio file.
- *
- * If the file exceeds the size limit, throws an `Error`.
- */
-export async function saveAudioFile(file: File): Promise<string> {
-    const [id, audioData, metadata] = await processAudioFile(file);
-
-    // Store the audio data (only dataUri, not buffer)
-    const audioStore: AudioStore = await getAllAudio();
-    audioStore[id] = audioData;
-    await setAudioStore(audioStore);
-
-    // Store metadata separately for fast access
-    const metadataStore: MetadataStore = await getAllAudioMetadata();
-    metadataStore[id] = metadata;
-    await setMetadataStore(metadataStore);
-
-    return id;
-}
-
-
-/**
- * Saves multiple audio files.
- *
- * Returns an array, where each upload is represented with either a file ID string (if successful) or `Error`.
- */
-export async function saveAudioFiles(files: File[]): Promise<(string | Error)[]> {
-    const results: (string | Error)[] = [];
+export async function saveAudioData(audioData: [StoredAudioFile, AudioFileMetadata][]): Promise<void> {
     const audioStore: AudioStore = await getAllAudio();
     const metadataStore: MetadataStore = await getAllAudioMetadata();
 
-    for (const file of files) { // processing files asyncronounsly makes no real difference
-        try {
-            const [id, audioData, metadata] = await processAudioFile(file);
-            audioStore[id] = audioData;
-            metadataStore[id] = metadata;
-            results.push(id);
-        } catch (error: any) {
-            results.push(error as Error);
-        }
+    for (const [data, metadata] of audioData) { // processing files asyncronounsly makes no real difference
+        audioStore[metadata.id] = data;
+        metadataStore[metadata.id] = metadata;
     }
 
     await setAudioStore(audioStore);
     await setMetadataStore(metadataStore);
-
-    return results;
 }
 
-async function processAudioFile(file: File): Promise<[string, StoredAudioFile, AudioFileMetadata]> {
+export async function processAudioFile(file: File): Promise<[StoredAudioFile, AudioFileMetadata]> {
     const maxBytes = maxFileSizeMB * 1024 * 1024;
     if (file.size > maxBytes) {
         const fileMB = (file.size / (1024 * 1024)).toFixed(1);
@@ -137,7 +101,6 @@ async function processAudioFile(file: File): Promise<[string, StoredAudioFile, A
     const dataUri = await generateDataURI(buffer, file.type, file.name);
 
     return [
-        id,
         {
             id,
             name: file.name,
