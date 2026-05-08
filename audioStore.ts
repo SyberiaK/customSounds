@@ -183,9 +183,9 @@ export async function clearStore(): Promise<void> {
 /**
  * Migrates old storage format to new format (run once on startup).
  */
-export async function migrateStorage(): Promise<boolean> {
+export async function migrateStorage(): Promise<{ [oldId: string]: string; } | null> {
     const audioStore = (await get(STORAGE_KEY)) as Record<string, any> | undefined;
-    if (!audioStore) return false;
+    if (!audioStore) return null;
 
     let needsMigration = false;
     let needsMetadataRebuild = false;
@@ -207,8 +207,7 @@ export async function migrateStorage(): Promise<boolean> {
         needsMetadataRebuild = true;
     }
 
-    // this migration section is half arsed since it does migrate sounds
-    // but still breaks the imports if the id is changed
+    const migratedFiles: { [oldId: string]: string; } = {};
     if (needsMigration) {
         logger.info("Migrating storage to remove redundant buffers and fix IDs...");
         const newAudioStore: AudioStore = {};
@@ -225,14 +224,17 @@ export async function migrateStorage(): Promise<boolean> {
 
             if (!dataUri) continue;
 
-            const new_id = file.name;
+            const oldId = file.id;
+            const newId = file.name;
 
-            newAudioStore[new_id] = {
-                id: new_id,
+            newAudioStore[newId] = {
+                id: newId,
                 name: file.name || "Unknown",
                 type: file.type || "audio/mpeg",
                 dataUri
             };
+
+            migratedFiles[oldId] = newId;
         }
 
         await setAudioStore(newAudioStore);
@@ -258,7 +260,7 @@ export async function migrateStorage(): Promise<boolean> {
         logger.info("Metadata rebuild complete");
     }
 
-    return needsMigration || needsMetadataRebuild;
+    return migratedFiles;
 }
 
 async function generateDataURI(buffer: ArrayBuffer, type: string, name: string): Promise<string> {

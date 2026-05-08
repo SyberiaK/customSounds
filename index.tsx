@@ -543,10 +543,18 @@ export default definePlugin({
                 resetSeasonalOverridesToDefault();
             }
 
-            // Migrate old storage format if needed (removes redundant buffers)
-            await AudioStore.migrateStorage();
+            const migratedFiles = await AudioStore.migrateStorage();
+            if (migratedFiles) {
+                allSoundTypes.forEach(type => {
+                    const override = getOverride(type.id);
+                    if (override.selectedFileId) {
+                        const newId = migratedFiles[override.selectedFileId];
+                        override.selectedFileId = newId ?? override.selectedFileId;
+                        setOverride(type.id, override);
+                    }
+                });
+            }
 
-            // Preload enabled custom sounds into memory
             await preloadDataURIs();
         } catch (error) {
             logger.error("Startup error:", error);
