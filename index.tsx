@@ -279,9 +279,9 @@ const settings = definePluginSettings({
                             });
 
                             if (doSkip) continue;
-
-                            audioDataToSave.push([data, metadata]);
                         }
+
+                        audioDataToSave.push([data, metadata]);
                     } catch (error: any) {
                         logger.error("Upload error:", error);
                         const message = error.message ?? "Unknown error";
