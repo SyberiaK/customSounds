@@ -167,11 +167,11 @@ export async function debugCustomSounds(): Promise<void> {
     logger.info(`Enabled overrides: ${enabledCount} (${customSoundCount} custom)`);
 
     const metadata = await AudioStore.getAllAudioMetadata();
-    logger.info("Audio files:");
-    for (const [id, file] of Object.entries(metadata)) {
-        logger.info(`  - ${file.name} (${Math.round(file.size / 1024)}KB) [${id}]`);
-    }
+    const filesData: string = Object.entries(metadata)
+        .map(([id, file]) => `  - ${file.name} (${Math.round(file.size / 1024)}KB) [${id}]`)
+        .join("\n");
 
+    logger.info("Audio files:\n" + filesData);
     logger.info("=== END DEBUG ===");
 }
 

@@ -153,7 +153,6 @@ export async function migrateStorage(): Promise<{ [oldId: string]: string; } | n
     let needsMigration = false;
     let needsMetadataRebuild = false;
 
-    // Check if any entries have the old 'buffer' field
     for (const file of Object.values(audioStore)) {
         if (!file) continue;
         if (typeof file !== "object") continue;
@@ -176,7 +175,6 @@ export async function migrateStorage(): Promise<{ [oldId: string]: string; } | n
         const newAudioStore: AudioStore = {};
 
         for (const file of Object.values(audioStore)) {
-            logger.info(file);
             if (!file || typeof file !== "object") continue;
 
             // If it has dataUri, keep it; if only buffer, generate dataUri
@@ -187,6 +185,10 @@ export async function migrateStorage(): Promise<{ [oldId: string]: string; } | n
 
             if (!dataUri) continue;
 
+            logger.debug("Migrating a file: ", file);
+
+            // might want to reuse processAudioFile for this (and the migration check above)
+            // so it's not pain in the ass to change it (if ever needed at all)
             const oldId = file.id;
             const newId = file.name;
 
