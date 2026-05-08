@@ -9,7 +9,6 @@ import { Card } from "@components/Card";
 import { FormSwitch } from "@components/FormSwitch";
 import { Heading } from "@components/Heading";
 import { classNameFactory } from "@utils/css";
-import { Margins } from "@utils/margins";
 import { useForceUpdater } from "@utils/react";
 import { makeRange } from "@utils/types";
 import { findByCodeLazy } from "@webpack";
@@ -150,13 +149,12 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                     override.enabled = val;
                     saveAndNotify();
                 }}
-                className={Margins.bottom16}
                 hideBorder
             />
 
             {override.enabled && (
-                <>
-                    <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+                <div className={cl("card-content")}>
+                    <div className={cl("buttons")}>
                         <Button
                             variant="positive"
                             onClick={previewSound}
@@ -170,37 +168,37 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                             Stop
                         </Button>
                     </div>
-
-                    <Heading>Volume</Heading>
-                    <Slider
-                        markers={makeRange(0, 100, 10)}
-                        initialValue={override.volume}
-                        onValueChange={val => {
-                            override.volume = val;
-                            saveAndNotify();
-                        }}
-                        className={Margins.bottom16}
-                        disabled={!override.enabled}
-                    />
-
-                    <Heading>Sound Source</Heading>
-                    <Select
-                        options={[
-                            { value: "default", label: "Default" },
-                            ...(type.seasonal?.map(id => ({ value: id, label: capitalizeWords(id) })) ?? []),
-                            { value: "custom", label: "Custom" }
-                        ]}
-                        isSelected={v => v === override.selectedSound}
-                        select={async v => {
-                            override.selectedSound = v;
-                            saveAndNotify();
-                        }}
-                        serialize={opt => opt.value}
-                        className={Margins.bottom16}
-                    />
+                    <div className={cl("card-option")}>
+                        <Heading>Volume</Heading>
+                        <Slider
+                            markers={makeRange(0, 100, 10)}
+                            initialValue={override.volume}
+                            onValueChange={val => {
+                                override.volume = val;
+                                saveAndNotify();
+                            }}
+                            disabled={!override.enabled}
+                        />
+                    </div>
+                    <div className={cl("card-option")}>
+                        <Heading>Sound Source</Heading>
+                        <Select
+                            options={[
+                                { value: "default", label: "Default" },
+                                ...(type.seasonal?.map(id => ({ value: id, label: capitalizeWords(id) })) ?? []),
+                                { value: "custom", label: "Custom" }
+                            ]}
+                            isSelected={v => v === override.selectedSound}
+                            select={async v => {
+                                override.selectedSound = v;
+                                saveAndNotify();
+                            }}
+                            serialize={opt => opt.value}
+                        />
+                    </div>
 
                     {override.selectedSound === "custom" && (
-                        <>
+                        <div className={cl("card-option")}>
                             <Heading>Custom File</Heading>
                             <Select
                                 options={[
@@ -213,21 +211,17 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                                     saveAndNotify();
                                 }}
                                 serialize={opt => opt.value}
-                                className={Margins.bottom8}
                             />
-                            <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
-                                {override.selectedFileId && files[override.selectedFileId] && (
-                                    <Button
-                                        variant="dangerPrimary"
-                                        onClick={() => deleteFile(override.selectedFileId!)}
-                                    >
-                                        Remove Selected Sound
-                                    </Button>
-                                )}
-                            </div>
-                        </>
+                            <Button
+                                variant="dangerPrimary"
+                                onClick={() => deleteFile(override.selectedFileId!)}
+                                disabled={!override.selectedFileId || !files[override.selectedFileId]}
+                            >
+                                Remove Selected Sound
+                            </Button>
+                        </div>
                     )}
-                </>
+                </div>
             )}
         </Card>
     );

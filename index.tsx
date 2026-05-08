@@ -13,7 +13,6 @@ import { Paragraph } from "@components/Paragraph";
 import { Devs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
 import { Logger } from "@utils/Logger";
-import { Margins } from "@utils/margins";
 import { useForceUpdater } from "@utils/react";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
 import { saveFile } from "@utils/web";
@@ -374,65 +373,69 @@ const settings = definePluginSettings({
             );
 
             return (
-                <div>
-                    <Heading>Custom Sounds</Heading>
-                    <div className={cl("buttons")}>
-                        <Button variant="positive" onClick={() => audioFilesInputRef.current?.click()}>Add</Button>
-                        <Button
-                            disabled={Object.keys(files).length === 0}
-                            variant="dangerPrimary"
-                            onClick={() => {
-                                Alerts.show({
-                                    title: "Are you sure?",
-                                    body: `This will remove ${Object.keys(files).length} file${Object.keys(files).length === 1 ? "" : "s"} imported into the plugin.`,
-                                    async onConfirm() {
-                                        await AudioStore.clearStore();
-                                        dataUriCache.clear();
-                                        update();
-                                        await loadFiles();
-                                        allSoundTypes.forEach(type => {
-                                            const override = getOverride(type.id);
-                                            override.selectedFileId = undefined;
-                                            setOverride(type.id, override);
-                                        });
-                                        showToast("Files removed successfully.");
-                                    },
-                                    confirmText: "Do it!",
-                                    confirmColor: "vc-notification-log-danger-btn",
-                                    cancelText: "Nevermind"
-                                });
+                <div className={cl("main")}>
+                    <div className={cl("section")}>
+                        <Heading>Custom Audio Files</Heading>
+                        <div className={cl("buttons")}>
+                            <Button variant="positive" onClick={() => audioFilesInputRef.current?.click()}>Add</Button>
+                            <Button
+                                disabled={Object.keys(files).length === 0}
+                                variant="dangerPrimary"
+                                onClick={() => {
+                                    Alerts.show({
+                                        title: "Are you sure?",
+                                        body: `This will remove ${Object.keys(files).length} file${Object.keys(files).length !== 1 ? "s" : ""} imported into the plugin.`,
+                                        async onConfirm() {
+                                            await AudioStore.clearStore();
+                                            dataUriCache.clear();
+                                            update();
+                                            await loadFiles();
+                                            allSoundTypes.forEach(type => {
+                                                const override = getOverride(type.id);
+                                                override.selectedFileId = undefined;
+                                                setOverride(type.id, override);
+                                            });
+                                            showToast("Files removed successfully.");
+                                        },
+                                        confirmText: "Do it!",
+                                        confirmColor: "vc-notification-log-danger-btn",
+                                        cancelText: "Nevermind"
+                                    });
+                                }}
+                            >
+                                Remove All</Button>
+                            <Button variant="overlayPrimary" onClick={() => {
+                                debugCustomSounds();
+                                showToast("Debug info printed in the console.");
                             }}
-                        >
-                            Remove All</Button>
-                        <Button variant="overlayPrimary" onClick={() => {
-                            debugCustomSounds();
-                            showToast("Debug info printed in the console.");
-                        }}
-                        >
-                            Debug</Button>
-                        <input
-                            ref={audioFilesInputRef}
-                            type="file"
-                            accept={audioExtensionsString}
-                            multiple
-                            style={{ display: "none" }}
-                            onChange={uploadFiles}
-                        />
+                            >
+                                Debug</Button>
+                            <input
+                                ref={audioFilesInputRef}
+                                type="file"
+                                accept={audioExtensionsString}
+                                multiple
+                                style={{ display: "none" }}
+                                onChange={uploadFiles}
+                            />
+                        </div>
                     </div>
-                    <Heading>Overrides</Heading>
-                    <div className={cl("buttons")}>
-                        <Button variant="primary" onClick={() => settingsFileInputRef.current?.click()}>Import</Button>
-                        <Button variant="secondary" onClick={downloadSettings}>Export</Button>
-                        <Button variant="dangerPrimary" onClick={resetOverrides}>Reset All</Button>
-                        <input
-                            ref={settingsFileInputRef}
-                            type="file"
-                            accept=".json"
-                            style={{ display: "none" }}
-                            onChange={handleSettingsUpload}
-                        />
+                    <div className={cl("section")}>
+                        <Heading>Overrides</Heading>
+                        <div className={cl("buttons")}>
+                            <Button variant="primary" onClick={() => settingsFileInputRef.current?.click()}>Import</Button>
+                            <Button variant="secondary" onClick={downloadSettings}>Export</Button>
+                            <Button variant="dangerPrimary" onClick={() => { resetOverrides(); showToast("All overrides reset successfully!"); }}>Reset All</Button>
+                            <input
+                                ref={settingsFileInputRef}
+                                type="file"
+                                accept=".json"
+                                style={{ display: "none" }}
+                                onChange={handleSettingsUpload}
+                            />
+                        </div>
+                        <Paragraph>NOTE: before importing settings, make sure to add required audio files by clicking "Add" button.</Paragraph>
                     </div>
-                    <Paragraph className={Margins.bottom16}>NOTE: before importing settings, make sure to add required audio files by clicking "Add" button.</Paragraph>
                     <div className={cl("search")}>
                         <Heading>Search Sounds</Heading>
                         <TextInput
