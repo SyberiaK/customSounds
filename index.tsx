@@ -17,7 +17,8 @@ import { Margins } from "@utils/margins";
 import { useForceUpdater } from "@utils/react";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
 import { saveFile } from "@utils/web";
-import { Alerts, React, showToast, TextInput } from "@webpack/common";
+import { MessageJSON } from "@vencord/discord-types";
+import { Alerts, React, showToast, TextInput, UserStore } from "@webpack/common";
 
 import * as AudioStore from "./audioStore";
 import { LRU } from "./cache";
@@ -522,6 +523,15 @@ export default definePlugin({
                 replace: 'return;return $self.isOverriden("connect") ? "connect" : "user_join"'
             }
         },
+        {
+            find: ".getDesktopType()===",
+            replacement: [
+                {
+                    match: /sound:(\i\?\i:void 0,volume:\i,onClick)/,
+                    replace: 'sound: $self.mentionsEveryone(arguments[0]?.message) && $self.isOverriden("mention2") ? "mention2" : $self.mentionsMe(arguments[0]?.message) && $self.isOverriden("user_mentioned") ? "user_mentioned" : $1'
+                }
+            ]
+        }
     ],
     findOverride,
     isOverriden,
@@ -529,6 +539,12 @@ export default definePlugin({
     refreshDataURI,
     ensureDataURICached,
     debugCustomSounds,
+    mentionsEveryone(message: MessageJSON) {
+        return message.mention_everyone;
+    },
+    mentionsMe(message: MessageJSON) {
+        return message.mentions.some(m => m.id === UserStore.getCurrentUser().id);
+    },
     startAt: StartAt.Init,
 
     async start() {
