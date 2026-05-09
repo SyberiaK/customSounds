@@ -8,7 +8,7 @@ export interface SoundType {
     name: string;
     id: string;
     seasonal?: string[];
-    derived?: string; // any sound with this is implemented by the plugin (only one so far)
+    derived?: string; // any sound with this is implemented by the plugin
 }
 
 export interface SoundOverride {
