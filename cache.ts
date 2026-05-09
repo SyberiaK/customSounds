@@ -39,7 +39,6 @@ export class LRU {
         while (this._size + uriSize > this._maxSize && this.cache.size > 0) {
             const oldestKey = this.first();
 
-            // todo: isn't `this.cache.size > 0` there to ensure at least one key is present?
             if (oldestKey) {
                 const oldestSize = this.cache.get(oldestKey)?.length || 0;
                 this.cache.delete(oldestKey);
