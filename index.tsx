@@ -197,6 +197,12 @@ const fileSizeOptions = [
 
 const settings = definePluginSettings({
     ...soundSettings,
+    skipForAll: {
+        type: OptionType.BOOLEAN,
+        description: "Used for the existing file upload alert",
+        default: false,
+        hidden: true
+    },
     maxFileSize: {
         type: OptionType.SELECT,
         description: "Larger uploads use more memory, take more time to process and may cause performance issues or crashes on lower-end devices. Increase at your own risk!",
@@ -271,11 +277,17 @@ const settings = definePluginSettings({
                         const [data, metadata] = await AudioStore.processAudioFile(file);
 
                         if (files[metadata.id]) {
+                            if (settings.store.skipForAll) continue;
+
                             const doSkip = await Alerts.confirm({
                                 title: "The file already exists",
                                 body: `You already have a file named "${metadata.name}" uploaded.`,
                                 confirmText: "Skip",
-                                cancelText: "Replace"
+                                secondaryConfirmText: "Skip for all",
+                                cancelText: "Replace",
+                                onConfirmSecondary() {
+                                    settings.store.skipForAll = true;
+                                },
                             });
 
                             if (doSkip) continue;
@@ -289,6 +301,7 @@ const settings = definePluginSettings({
                         continue;
                     }
                 }
+                settings.store.skipForAll = false;
 
                 await AudioStore.saveAudioData(audioDataToSave);
 
