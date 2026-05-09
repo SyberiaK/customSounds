@@ -7,8 +7,8 @@
 import { get, set } from "@api/DataStore";
 import { Logger } from "@utils/Logger";
 
-const STORAGE_KEY = "ScattrdCustomSounds";
-const METADATA_KEY = "ScattrdCustomSounds_Metadata";
+const STORAGE_KEY = "CustomSounds";
+const METADATA_KEY = "CustomSounds_Metadata";
 
 // Default maximum file size: 15MB per file
 const DEFAULT_MAX_FILE_SIZE_MB = 15;
