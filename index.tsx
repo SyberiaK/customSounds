@@ -68,8 +68,7 @@ export function getCustomSoundURL(id: string): string | null {
         const soundType = allSoundTypes.find(t => t.id === id);
         if (!soundType?.seasonal) return null;
 
-        // todo: is it even possible for `override.selectedSound` to be "halloween" or "winter"?
-        // todo: (which is what i assume this checks for)
+        // is it even possible for `override.selectedSound` to be "halloween" or "winter"?
         logger.debug(`${id} reached the seasonal check? soundType: ${soundType}`);
         const seasonalId = soundType.seasonal.find(id => id.startsWith(`${override.selectedSound}_`));
         if (seasonalId && seasonalId in SEASONAL_SOUNDS) {
@@ -305,7 +304,6 @@ const settings = definePluginSettings({
 
                 await AudioStore.saveAudioData(audioDataToSave);
 
-                // todo: can we somehow do this in parallel without taking all the RAM?
                 for (const [_, metadata] of audioDataToSave) await ensureDataURICached(metadata.id);
 
                 update();
