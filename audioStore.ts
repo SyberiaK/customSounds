@@ -97,20 +97,38 @@ export async function processAudioFile(file: File): Promise<[StoredAudioFile, Au
     }
 
     const buffer = await file.arrayBuffer();
-    const id = file.name;
     const dataUri = await generateDataURI(buffer, file.type, file.name);
+
+    return await importAudioData({
+        id: "",
+        name: file.name,
+        type: file.type,
+        dataUri
+    });
+}
+
+export async function importAudioData(data: StoredAudioFile): Promise<[StoredAudioFile, AudioFileMetadata]> {
+    const { name, type, dataUri } = data;
+
+    const maxBytes = maxFileSizeMB * 1024 * 1024;
+    if (dataUri.length > maxBytes) {
+        const fileMB = (dataUri.length / (1024 * 1024)).toFixed(1);
+        throw new Error(`File "${name}" is too large (${fileMB}MB). Maximum size is ${maxFileSizeMB}MB.`);
+    }
+
+    const id = data.id ?? name;
 
     return [
         {
             id,
-            name: file.name,
-            type: file.type,
+            name,
+            type,
             dataUri
         },
         {
             id,
-            name: file.name,
-            type: file.type,
+            name,
+            type,
             size: dataUri.length
         }
     ];

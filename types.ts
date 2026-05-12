@@ -137,7 +137,14 @@ export function makeEmptyOverride(): SoundOverride {
     };
 }
 
+export interface ExportedAudioFile {
+    id: string;
+    name: string;
+    type: string;
+    dataUri: string;
+}
+
 export interface SettingsExport {
-    __note: "Audio files are not included in exports and will need to be re-added before import";
     overrides: ({ id: string; } & SoundOverride)[];
+    files: ExportedAudioFile[];
 }

@@ -22,7 +22,7 @@ import { Alerts, React, showToast, TextInput, UserStore } from "@webpack/common"
 import * as AudioStore from "./audioStore";
 import { LRU } from "./cache";
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
-import { makeEmptyOverride, SEASONAL_SOUNDS, SettingsExport, SOUND_TYPES, SoundOverride } from "./types";
+import { ExportedAudioFile, makeEmptyOverride, SEASONAL_SOUNDS, SettingsExport, SOUND_TYPES, SoundOverride } from "./types";
 
 const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "m4a", "aac", "flac", "webm", "wma", "mp4"];
 const audioExtensionsString = AUDIO_EXTENSIONS.map(v => `.${v}`).join(",");
@@ -275,12 +275,15 @@ const settings = definePluginSettings({
                     try {
                         const [data, metadata] = await AudioStore.processAudioFile(file);
 
-                        if (files[metadata.id]) {
-                            if (settings.store.skipForAll) continue;
+                        if (files[data.id]) {
+                            if (settings.store.skipForAll) return true;
+
+                            const existingDataUri = await AudioStore.getAudioDataURI(data.id);
+                            if (existingDataUri === data.dataUri) return true;
 
                             const doSkip = await Alerts.confirm({
                                 title: "The file already exists",
-                                body: `You already have a file named "${metadata.name}" uploaded.`,
+                                body: `You already have a file named "${data.name}" uploaded.`,
                                 confirmText: "Skip",
                                 secondaryConfirmText: "Skip for all",
                                 cancelText: "Replace",
@@ -303,11 +306,10 @@ const settings = definePluginSettings({
                 settings.store.skipForAll = false;
 
                 await AudioStore.saveAudioData(audioDataToSave);
+                for (const [data] of audioDataToSave) await ensureDataURICached(data.id);
 
-                for (const [_, metadata] of audioDataToSave) await ensureDataURICached(metadata.id);
-
-                update();
                 await loadFiles();
+                update();
                 showToast(`Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`);
                 event.target.value = "";
             };
@@ -322,6 +324,56 @@ const settings = definePluginSettings({
                     try {
                         resetOverrides();
                         const imported: SettingsExport = JSON.parse(e.target?.result as string);
+
+                        const newlyAddedAudioIDs: string[] = [];
+                        if (imported.files && Array.isArray(imported.files)) {
+                            const audioDataToSave: [AudioStore.StoredAudioFile, AudioStore.AudioFileMetadata][] = [];
+                            for (const importedFile of imported.files) {
+                                try {
+                                    if (!importedFile?.name || !importedFile?.dataUri) continue;
+
+                                    const [data, metadata] = await AudioStore.importAudioData(importedFile);
+
+                                    if (files[data.id]) {
+                                        if (settings.store.skipForAll) continue;
+
+                                        const dataUri = await AudioStore.getAudioDataURI(data.id);
+                                        if (dataUri === data.dataUri) continue;
+
+                                        const doSkip = await Alerts.confirm({
+                                            title: "The file already exists",
+                                            body: `You already have a file named "${data.name}" uploaded.`,
+                                            confirmText: "Skip",
+                                            secondaryConfirmText: "Skip for all",
+                                            cancelText: "Replace",
+                                            onConfirmSecondary() {
+                                                settings.store.skipForAll = true;
+                                            },
+                                        });
+
+                                        if (doSkip) continue;
+                                    }
+
+                                    audioDataToSave.push([data, metadata]);
+                                    newlyAddedAudioIDs.push(data.id);
+                                } catch (error: any) {
+                                    logger.error("Import error:", error);
+                                    const message = error.message ?? "Unknown error";
+                                    showToast(message.includes("too large") ? message : `Import of "${error.name}" failed: ${message}`);
+                                    continue;
+                                }
+                            }
+
+                            settings.store.skipForAll = false;
+
+                            await AudioStore.saveAudioData(audioDataToSave);
+                            for (const [data] of audioDataToSave) await ensureDataURICached(data.id);
+
+                            await loadFiles();
+                            update();
+
+                            showToast(`Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`);
+                        }
 
                         const empty = makeEmptyOverride();
                         const filesMissing: ({ id: string; } & SoundOverride)[] = [];
@@ -338,7 +390,7 @@ const settings = definePluginSettings({
                                 setOverride(setting.id, override);
 
                                 if (!setting.selectedFileId) continue;
-                                if (!files[setting.selectedFileId]) filesMissing.push(setting);
+                                if (!files[setting.selectedFileId] && !newlyAddedAudioIDs.includes(setting.selectedFileId)) filesMissing.push(setting);
 
                                 await ensureDataURICached(setting.selectedFileId);
                             }
@@ -390,12 +442,26 @@ const settings = definePluginSettings({
                     };
                 }).filter(o => o.enabled || o.selectedSound !== "default");
 
+                const usedFiles = new Set<string>();
+                for (const o of overrides) {
+                    if (o.selectedFileId) usedFiles.add(o.selectedFileId);
+                }
+
+                const audioData = await AudioStore.getAllAudio();
+                const filesToBundle: ExportedAudioFile[] = [];
+                for (const fileId of usedFiles) {
+                    const file = audioData[fileId];
+                    if (!file?.dataUri) continue;
+
+                    filesToBundle.push(file);
+                }
+
                 const exportPayload: SettingsExport = {
-                    __note: "Audio files are not included in exports and will need to be re-added before import",
-                    overrides
+                    overrides,
+                    files: filesToBundle
                 };
 
-                showToast(`Exporting ${overrides.length} settings... (Audio files are not included!)`);
+                showToast(`Exporting ${overrides.length} settings and ${filesToBundle.length} files...`);
 
                 const file = new File(
                     [JSON.stringify(exportPayload, null, 2)],
