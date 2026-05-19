@@ -276,10 +276,10 @@ const settings = definePluginSettings({
                         const [data, metadata] = await AudioStore.processAudioFile(file);
 
                         if (files[data.id]) {
-                            if (settings.store.skipForAll) return true;
+                            if (settings.store.skipForAll) continue;
 
                             const existingDataUri = await AudioStore.getAudioDataURI(data.id);
-                            if (existingDataUri === data.dataUri) return true;
+                            if (existingDataUri === data.dataUri) continue;
 
                             const doSkip = await Alerts.confirm({
                                 title: "The file already exists",

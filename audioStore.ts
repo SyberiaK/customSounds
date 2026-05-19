@@ -100,7 +100,7 @@ export async function processAudioFile(file: File): Promise<[StoredAudioFile, Au
     const dataUri = await generateDataURI(buffer, file.type, file.name);
 
     return await importAudioData({
-        id: "",
+        id: file.name,
         name: file.name,
         type: file.type,
         dataUri
@@ -116,7 +116,7 @@ export async function importAudioData(data: StoredAudioFile): Promise<[StoredAud
         throw new Error(`File "${name}" is too large (${fileMB}MB). Maximum size is ${maxFileSizeMB}MB.`);
     }
 
-    const id = data.id ?? name;
+    const id = data.id || name;
 
     return [
         {
