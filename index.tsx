@@ -442,9 +442,21 @@ const settings = definePluginSettings({
                     };
                 }).filter(o => o.enabled || o.selectedSound !== "default");
 
-                const usedFiles = new Set<string>();
+                const allFiles = new Set(Object.keys(files));
+                let usedFiles = new Set<string>();
                 for (const o of overrides) {
                     if (o.selectedFileId) usedFiles.add(o.selectedFileId);
+                }
+
+                if (allFiles.size > usedFiles.size) {
+                    const includeAll = await Alerts.confirm({
+                        title: "Some of files are unused",
+                        body: "Some of the files are unused in your overrides. Do you want to include them in the export output?",
+                        confirmText: "Yes",
+                        cancelText: "No",
+                    });
+
+                    if (includeAll) usedFiles = allFiles;
                 }
 
                 const audioData = await AudioStore.getAllAudio();
@@ -538,7 +550,6 @@ const settings = definePluginSettings({
                                 onChange={handleSettingsUpload}
                             />
                         </div>
-                        <Paragraph>NOTE: before importing settings, make sure to add required audio files by clicking "Add" button.</Paragraph>
                     </div>
                     <div className={cl("search")}>
                         <Heading>Search Sounds</Heading>
