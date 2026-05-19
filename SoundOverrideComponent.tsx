@@ -72,7 +72,9 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
         try {
             const dataUri = await AudioStore.getAudioDataURI(selectedFileId);
 
-            if (!dataUri || !dataUri.startsWith("data:audio/")) {
+            if (!dataUri || !(
+                dataUri.startsWith("data:audio/") || dataUri.startsWith("data:video/")
+            )) {
                 showToast("No custom sound file available for preview");
                 return;
             }
@@ -94,6 +96,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                     ? "Format not supported by browser. Try MP3 or WAV."
                     : "Could not play file. It may be corrupted or in an unsupported format.";
                 showToast(msg);
+                console.debug("[CustomSounds] Error handled in previewSound:", audio.error?.message);
             };
 
             await audio.play();

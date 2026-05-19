@@ -24,6 +24,7 @@ import { LRU } from "./cache";
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
 import { ExportedAudioFile, makeEmptyOverride, SEASONAL_SOUNDS, SettingsExport, SOUND_TYPES, SoundOverride } from "./types";
 
+// todo: is aac actually supported in any browser?
 const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "m4a", "aac", "flac", "webm", "wma", "mp4"];
 const audioExtensionsString = AUDIO_EXTENSIONS.map(v => `.${v}`).join(",");
 const audioExtensionsFormattedString = AUDIO_EXTENSIONS.map(v => `.${v}`).join(", ");
