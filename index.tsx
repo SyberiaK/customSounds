@@ -70,14 +70,14 @@ export async function ensureDataURICached(fileId: string): Promise<string | null
     const cached = dataUriCache.get(fileId);
     if (cached) return cached;
 
-    try {
-        const dataUri = await AudioStore.getAudioDataURI(fileId);
-        if (dataUri) {
+    const dataUri = await AudioStore.getAudioDataURI(fileId);
+    if (dataUri) {
+        try {
             dataUriCache.set(fileId, dataUri);
             return dataUri;
+        } catch (error) {
+            logger.error(`Error loading audio for ${fileId}:`, error);
         }
-    } catch (error) {
-        logger.error(`Error loading audio for ${fileId}:`, error);
     }
 
     return null;
@@ -115,21 +115,13 @@ async function preloadDataURIs(): Promise<void> {
     }
 
     if (fileIdsToPreload.size === 0) return;
+    for (const fileId of fileIdsToPreload) await ensureDataURICached(fileId);
 
-    let loaded = 0;
-    for (const fileId of fileIdsToPreload) {
-        try {
-            await ensureDataURICached(fileId);
-            loaded++;
-        } catch (error) {
-            logger.error(`Failed to preload file ${fileId}:`, error);
-        }
-    }
-
-    logger.info(`Preloaded ${loaded}/${fileIdsToPreload.size} custom sounds`);
+    logger.info(`Preloaded ${fileIdsToPreload.size} custom sounds`);
 }
 
 export async function debugCustomSounds(): Promise<void> {
+    // todo: remove this function, all info can already be extracted with the console
     logger.info("=== DEBUG INFO ===");
     logger.info(`Max file size: ${AudioStore.getMaxFileSizeMB()}MB`);
     logger.info(`Max cache size: ${Math.round(dataUriCache.maxSize() / (1024 * 1024))}MB`);
@@ -173,6 +165,7 @@ const soundSettings = Object.fromEntries(
     ])
 );
 
+// todo: in what scenarios is that even useful?? just set a hard cap brah
 const fileSizeOptions = [
     { value: 5, label: "5 MB (Conservative)" },
     { value: 15, label: "15 MB (Default)" },
@@ -353,8 +346,9 @@ const settings = definePluginSettings({
                         resetOverrides();
                         const imported: SettingsExport = JSON.parse(e.target?.result as string);
 
+                        // have to keep track of those because `files` doesn't get updated in time?
                         const newlyAddedAudioIDs: string[] = [];
-                        if (imported.files && Array.isArray(imported.files)) {
+                        if (Array.isArray(imported?.files)) {
                             const audioDataToSave: [AudioStore.StoredAudioFile, AudioStore.AudioFileMetadata][] = [];
 
                             let doSkip = false;
@@ -399,7 +393,7 @@ const settings = definePluginSettings({
 
                         const empty = makeEmptyOverride();
                         const filesMissing: ({ id: string; } & SoundOverride)[] = [];
-                        if (imported.overrides && Array.isArray(imported.overrides)) {
+                        if (Array.isArray(imported?.overrides)) {
                             for (const setting of imported.overrides) {
                                 if (!setting.id) continue;
 
@@ -547,7 +541,12 @@ const settings = definePluginSettings({
                         <div className={cl("buttons")}>
                             <Button variant="primary" onClick={() => settingsFileInputRef.current?.click()}>Import</Button>
                             <Button variant="secondary" onClick={downloadSettings}>Export</Button>
-                            <Button variant="dangerPrimary" onClick={() => { resetOverrides(); showToast("All overrides reset successfully!"); }}>Reset All</Button>
+                            <Button variant="dangerPrimary" onClick={() => {
+                                resetOverrides();
+                                showToast("All overrides reset successfully!", Toasts.Type.SUCCESS);
+                            }}
+                            >
+                                Reset All</Button>
                             <input
                                 ref={settingsFileInputRef}
                                 type="file"
@@ -576,10 +575,8 @@ const settings = definePluginSettings({
                                 if (currentOverride.selectedFileId &&
                                     !files[currentOverride.selectedFileId]) {
                                     currentOverride.selectedFileId = undefined;
-                                    // setOverride(type.id, currentOverride);  // breaks "file missing" prompt
+                                    // setOverride(type.id, currentOverride);  // todo: breaks "file missing" prompt
                                 }
-
-                                if (type.id === "disconnect") logger.debug("rerendering overrides list");
 
                                 return (
                                     <SoundOverrideComponent
@@ -592,12 +589,7 @@ const settings = definePluginSettings({
                                             setOverride(type.id, currentOverride);
 
                                             if (currentOverride.enabled && currentOverride.selectedSound === "custom" && currentOverride.selectedFileId) {
-                                                try {
-                                                    await ensureDataURICached(currentOverride.selectedFileId);
-                                                } catch (error) {
-                                                    logger.error("Failed to load custom sound:", error);
-                                                    showToast("Error loading custom sound file. Check console for details.");
-                                                }
+                                                await ensureDataURICached(currentOverride.selectedFileId);
                                             }
                                         }}
                                     />
@@ -613,6 +605,14 @@ const settings = definePluginSettings({
 
 export function isOverriden(id: string): boolean {
     return !!getOverride(id)?.enabled;
+}
+
+export function mentionsEveryone(message: MessageJSON): boolean {
+    return message.mention_everyone;
+}
+
+export function mentionsMe(message: MessageJSON): boolean {
+    return message.mentions.some(m => m.id === UserStore.getCurrentUser().id);
 }
 
 export function findOverride(id: string): SoundOverride | null {
@@ -669,12 +669,8 @@ export default definePlugin({
     refreshDataURI,
     ensureDataURICached,
     debugCustomSounds,
-    mentionsEveryone(message: MessageJSON) {
-        return message.mention_everyone;
-    },
-    mentionsMe(message: MessageJSON) {
-        return message.mentions.some(m => m.id === UserStore.getCurrentUser().id);
-    },
+    mentionsEveryone,
+    mentionsMe,
     startAt: StartAt.Init,
 
     async start() {

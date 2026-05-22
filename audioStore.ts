@@ -10,10 +10,7 @@ import { Logger } from "@utils/Logger";
 const STORAGE_KEY = "CustomSounds";
 const METADATA_KEY = "CustomSounds_Metadata";
 
-// Default maximum file size: 15MB per file
 const DEFAULT_MAX_FILE_SIZE_MB = 15;
-
-// Configurable max file size (set by plugin settings)
 let maxFileSizeMB = DEFAULT_MAX_FILE_SIZE_MB;
 
 const logger = new Logger("CustomSounds");
@@ -37,18 +34,12 @@ export interface AudioFileMetadata {
     id: string;
     name: string;
     type: string;
-    size: number; // Size of dataUri in bytes
+    size: number;
 }
 
-// Lightweight metadata stored separately for fast access
 type MetadataStore = Record<string, AudioFileMetadata>;
-
-// Full audio data (only dataUri, no redundant buffer)
 type AudioStore = Record<string, StoredAudioFile>;
 
-/**
- * Returns audio files metadata.
- */
 export async function getAllAudioMetadata(): Promise<MetadataStore> {
     return (await get(METADATA_KEY)) as MetadataStore ?? {};
 }
@@ -57,17 +48,11 @@ async function setMetadataStore(new_: MetadataStore): Promise<void> {
     await set(METADATA_KEY, new_);
 }
 
-/**
- * Returns a single audio file's data URI.
- */
 export async function getAudioDataURI(id: string): Promise<string | undefined> {
     const all: AudioStore = await getAllAudio();
     return all?.[id]?.dataUri;
 }
 
-/**
- * Returns all audio files (use sparingly as it loads all the data)
- */
 export async function getAllAudio(): Promise<AudioStore> {
     return (await get(STORAGE_KEY)) as AudioStore ?? {};
 }
@@ -134,9 +119,6 @@ export async function importAudioData(data: StoredAudioFile): Promise<[StoredAud
     ];
 }
 
-/**
- * Deletes an audio file.
- */
 export async function deleteAudio(id: string): Promise<void> {
     // Delete from audio store
     const audioStore: AudioStore = await getAllAudio();
@@ -153,17 +135,12 @@ export async function deleteAudio(id: string): Promise<void> {
     }
 }
 
-/**
- * Deletes all audio files.
- */
 export async function clearStore(): Promise<void> {
     await setAudioStore({});
     await setMetadataStore({});
 }
 
-/**
- * Migrates old storage format to new format (run once on startup).
- */
+// todo: pending for removal, requires to use console anyway
 export async function migrateStorage(): Promise<{ [oldId: string]: string; } | null> {
     const audioStore = (await get(STORAGE_KEY)) as Record<string, any> | undefined;
     if (!audioStore) return null;
@@ -189,13 +166,11 @@ export async function migrateStorage(): Promise<{ [oldId: string]: string; } | n
 
     const migratedFiles: { [oldId: string]: string; } = {};
     if (needsMigration) {
-        logger.info("Migrating storage to remove redundant buffers and fix IDs...");
         const newAudioStore: AudioStore = {};
 
         for (const file of Object.values(audioStore)) {
             if (!file || typeof file !== "object") continue;
 
-            // If it has dataUri, keep it; if only buffer, generate dataUri
             let { dataUri } = file;
             if (!dataUri && file.buffer) {
                 dataUri = await generateDataURI(file.buffer, file.type, file.name);
@@ -203,10 +178,6 @@ export async function migrateStorage(): Promise<{ [oldId: string]: string; } | n
 
             if (!dataUri) continue;
 
-            logger.debug("Migrating a file: ", file);
-
-            // might want to reuse processAudioFile for this (and the migration check above)
-            // so it's not pain in the ass to change it (if ever needed at all)
             const oldId = file.id;
             const newId = file.name;
 
@@ -222,11 +193,9 @@ export async function migrateStorage(): Promise<{ [oldId: string]: string; } | n
 
         await setAudioStore(newAudioStore);
         needsMetadataRebuild = true;
-        logger.info("Storage migration complete.");
     }
 
     if (needsMetadataRebuild) {
-        logger.info("Rebuilding metadata index...");
         const currentAudioStore = await getAllAudio();
         const newMetadataStore: MetadataStore = {};
 
@@ -240,7 +209,6 @@ export async function migrateStorage(): Promise<{ [oldId: string]: string; } | n
         }
 
         await setMetadataStore(newMetadataStore);
-        logger.info("Metadata rebuild complete");
     }
 
     return migratedFiles;
@@ -278,9 +246,6 @@ async function generateDataURI(buffer: ArrayBuffer, type: string, name: string):
     });
 }
 
-/**
- * Returns total storage usage info in an object.
- */
 export async function getStorageInfo(): Promise<{ fileCount: number; totalSizeKB: number; }> {
     const metadata = await getAllAudioMetadata();
     let totalSize = 0;
