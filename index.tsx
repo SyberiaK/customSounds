@@ -292,7 +292,7 @@ const settings = definePluginSettings({
 
                     const fileExtension = file.name.split(".").pop()?.toLowerCase();
                     if (!fileExtension || !AUDIO_EXTENSIONS.includes(fileExtension)) {
-                        showToast(`Invalid file type of "${file.name}". Please upload only audio files (${audioExtensionsFormattedString}).`);
+                        showToast(`Invalid file type of "${file.name}". Please upload only audio files (${audioExtensionsFormattedString}).`, Toasts.Type.FAILURE);
                         continue;
                     }
                     filteredFiles.push(file);
@@ -321,7 +321,7 @@ const settings = definePluginSettings({
                     } catch (error: any) {
                         logger.error("Upload error:", error);
                         const message = error.message ?? "Unknown error";
-                        showToast(message.includes("too large") ? message : `Upload of "${error.name}" failed: ${message}`);
+                        showToast(message.includes("too large") ? message : `Upload of "${file.name}" failed: ${message}`, Toasts.Type.FAILURE);
                         continue;
                     }
                 }
@@ -331,7 +331,7 @@ const settings = definePluginSettings({
 
                 await loadFiles();
                 update();
-                showToast(`Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`);
+                showToast(`Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`, Toasts.Type.SUCCESS);
                 event.target.value = "";
             };
 
@@ -377,7 +377,7 @@ const settings = definePluginSettings({
                                 } catch (error: any) {
                                     logger.error("Import error:", error);
                                     const message = error.message ?? "Unknown error";
-                                    showToast(message.includes("too large") ? message : `Import of "${error.name}" failed: ${message}`);
+                                    showToast(message.includes("too large") ? message : `Import of "${error.name}" failed: ${message}`, Toasts.Type.FAILURE);
                                     continue;
                                 }
                             }
@@ -388,7 +388,7 @@ const settings = definePluginSettings({
                             await loadFiles();
                             update();
 
-                            showToast(`Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`);
+                            showToast(`Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`, Toasts.Type.SUCCESS);
                         }
 
                         const empty = makeEmptyOverride();
@@ -436,10 +436,10 @@ const settings = definePluginSettings({
                             ));
                         }
 
-                        showToast("Settings imported successfully!");
+                        showToast("Settings imported successfully!", Toasts.Type.SUCCESS);
                     } catch (error) {
                         logger.error("Error importing settings:", error);
-                        showToast("Error importing settings. Check console for details.");
+                        showToast("Error importing settings. Check console for details.", Toasts.Type.FAILURE);
                     }
                 };
 
