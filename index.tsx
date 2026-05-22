@@ -16,8 +16,8 @@ import { Logger } from "@utils/Logger";
 import { useForceUpdater } from "@utils/react";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
 import { saveFile } from "@utils/web";
-import { MessageJSON } from "@vencord/discord-types";
-import { Alerts, React, showToast, TextInput, UserStore } from "@webpack/common";
+import { MessageJSON, RenderModalProps } from "@vencord/discord-types";
+import { ConfirmModal, openModal, React, showToast, TextInput, Toasts, UserStore } from "@webpack/common";
 
 import * as AudioStore from "./audioStore";
 import { LRU } from "./cache";
@@ -195,14 +195,34 @@ const fileSizeOptions = [
     { value: 100, label: "100 MB (Extreme - Use with caution!)" },
 ];
 
+function SkipFileModal({ modalProps, filename, resolve }: { modalProps: RenderModalProps; filename: string; resolve: (value: [boolean, boolean]) => void; }) {
+    const [repeatForAll, setRepeatForAll] = React.useState(false);
+    return (
+        <ConfirmModal
+            {...modalProps}
+            title="The file already exists"
+            subtitle={`You already have a file named "${filename}" uploaded.`}
+            confirmText="Skip"
+            cancelText="Replace"
+            checkboxProps={{
+                label: "Do for all",
+                checked: repeatForAll === true,
+                onChange: checked => setRepeatForAll(checked)
+            }}
+            onConfirm={() => { resolve([true, repeatForAll]); }}
+            onCancel={() => { resolve([false, repeatForAll]); }}
+        />
+    );
+}
+
+function resolveSkipFileModal(filename: string) {
+    return new Promise<[boolean, boolean]>(resolve => {
+        openModal(props => <SkipFileModal modalProps={props} filename={filename} resolve={resolve} />);
+    });
+}
+
 const settings = definePluginSettings({
     ...soundSettings,
-    skipForAll: {
-        type: OptionType.BOOLEAN,
-        description: "Used for the existing file upload alert",
-        default: false,
-        hidden: true
-    },
     maxFileSize: {
         type: OptionType.SELECT,
         description: "Larger uploads use more memory, take more time to process and may cause performance issues or crashes on lower-end devices. Increase at your own risk!",
@@ -249,6 +269,34 @@ const settings = definePluginSettings({
                 loadFiles();
             }, []);
 
+            function removeFilesModal() {
+                openModal(props => (
+                    <ConfirmModal
+                        {...props}
+                        title="Are you sure?"
+                        subtitle={`This will remove ${Object.keys(files).length} file${Object.keys(files).length !== 1 ? "s" : ""} imported into the plugin.`}
+                        confirmText="Do it!"
+                        cancelText="Nevermind"
+                        onConfirm={async () => {
+                            await AudioStore.clearStore();
+                            dataUriCache.clear();
+
+                            const empty = makeEmptyOverride();
+                            allSoundTypes.forEach(type => {
+                                const override = getOverride(type.id);
+                                override.selectedFileId = empty.selectedFileId;
+                                setOverride(type.id, override);
+                            });
+
+                            update();
+                            await loadFiles();
+
+                            showToast("Files removed successfully.", Toasts.Type.SUCCESS);
+                        }}
+                    />
+                ));
+            }
+
             const resetOverrides = () => {
                 allSoundTypes.forEach(type => setOverride(type.id, makeEmptyOverride()));
             };
@@ -272,31 +320,25 @@ const settings = definePluginSettings({
                 }
 
                 const audioDataToSave: [AudioStore.StoredAudioFile, AudioStore.AudioFileMetadata][] = [];
+                let doSkip = false;
+                let repeatForAll = false;
+
                 for (const file of filteredFiles) {
                     try {
                         const [data, metadata] = await AudioStore.processAudioFile(file);
 
                         if (files[data.id]) {
-                            if (settings.store.skipForAll) continue;
+                            if (doSkip && repeatForAll) continue;
 
                             const existingDataUri = await AudioStore.getAudioDataURI(data.id);
                             if (existingDataUri === data.dataUri) continue;
 
-                            const doSkip = await Alerts.confirm({
-                                title: "The file already exists",
-                                body: `You already have a file named "${data.name}" uploaded.`,
-                                confirmText: "Skip",
-                                secondaryConfirmText: "Skip for all",
-                                cancelText: "Replace",
-                                onConfirmSecondary() {
-                                    settings.store.skipForAll = true;
-                                },
-                            });
-
-                            if (doSkip) continue;
+                            if (!repeatForAll) {
+                                [doSkip, repeatForAll] = await resolveSkipFileModal(data.name);
+                            }
                         }
 
-                        audioDataToSave.push([data, metadata]);
+                        if (!doSkip) audioDataToSave.push([data, metadata]);
                     } catch (error: any) {
                         logger.error("Upload error:", error);
                         const message = error.message ?? "Unknown error";
@@ -304,7 +346,6 @@ const settings = definePluginSettings({
                         continue;
                     }
                 }
-                settings.store.skipForAll = false;
 
                 await AudioStore.saveAudioData(audioDataToSave);
                 for (const [data] of audioDataToSave) await ensureDataURICached(data.id);
@@ -329,6 +370,9 @@ const settings = definePluginSettings({
                         const newlyAddedAudioIDs: string[] = [];
                         if (imported.files && Array.isArray(imported.files)) {
                             const audioDataToSave: [AudioStore.StoredAudioFile, AudioStore.AudioFileMetadata][] = [];
+
+                            let doSkip = false;
+                            let repeatForAll = false;
                             for (const importedFile of imported.files) {
                                 try {
                                     if (!importedFile?.name || !importedFile?.dataUri) continue;
@@ -336,27 +380,20 @@ const settings = definePluginSettings({
                                     const [data, metadata] = await AudioStore.importAudioData(importedFile);
 
                                     if (files[data.id]) {
-                                        if (settings.store.skipForAll) continue;
+                                        if (doSkip && repeatForAll) continue;
 
                                         const dataUri = await AudioStore.getAudioDataURI(data.id);
                                         if (dataUri === data.dataUri) continue;
 
-                                        const doSkip = await Alerts.confirm({
-                                            title: "The file already exists",
-                                            body: `You already have a file named "${data.name}" uploaded.`,
-                                            confirmText: "Skip",
-                                            secondaryConfirmText: "Skip for all",
-                                            cancelText: "Replace",
-                                            onConfirmSecondary() {
-                                                settings.store.skipForAll = true;
-                                            },
-                                        });
-
-                                        if (doSkip) continue;
+                                        if (!repeatForAll) {
+                                            [doSkip, repeatForAll] = await resolveSkipFileModal(data.name);
+                                        }
                                     }
 
-                                    audioDataToSave.push([data, metadata]);
-                                    newlyAddedAudioIDs.push(data.id);
+                                    if (!doSkip) {
+                                        audioDataToSave.push([data, metadata]);
+                                        newlyAddedAudioIDs.push(data.id);
+                                    }
                                 } catch (error: any) {
                                     logger.error("Import error:", error);
                                     const message = error.message ?? "Unknown error";
@@ -364,8 +401,6 @@ const settings = definePluginSettings({
                                     continue;
                                 }
                             }
-
-                            settings.store.skipForAll = false;
 
                             await AudioStore.saveAudioData(audioDataToSave);
                             for (const [data] of audioDataToSave) await ensureDataURICached(data.id);
@@ -398,26 +433,27 @@ const settings = definePluginSettings({
                         }
 
                         if (filesMissing.length !== 0) {
-                            Alerts.show({
-                                title: "Audio files not found",
-                                body: `Seems like some custom audio files are missing: ${filesMissing.map(setting => setting.selectedFileId).join(", ")}. Do you want to add missing files?`,
-                                async onConfirm() {
-                                    audioFilesInputRef.current?.click();
-                                },
-                                async onCancel() {
-                                    filesMissing.forEach(setting => {
-                                        const override: SoundOverride = {
-                                            enabled: setting.enabled,
-                                            selectedSound: setting.selectedSound,
-                                            selectedFileId: empty.selectedFileId,
-                                            volume: setting.volume,
-                                        };
-                                        setOverride(setting.id, override);
-                                    });
-                                },
-                                confirmText: "Yes",
-                                cancelText: "No"
-                            });
+                            openModal(props => (
+                                <ConfirmModal
+                                    {...props}
+                                    title="Audio files not found"
+                                    subtitle={`Seems like some custom audio files are missing: ${filesMissing.map(setting => setting.selectedFileId).join(", ")}. Do you want to add missing files?`}
+                                    confirmText="Yes"
+                                    cancelText="No"
+                                    onConfirm={() => { audioFilesInputRef.current?.click(); }}
+                                    onCancel={() => {
+                                        filesMissing.forEach(setting => {
+                                            const override: SoundOverride = {
+                                                enabled: setting.enabled,
+                                                selectedSound: setting.selectedSound,
+                                                selectedFileId: empty.selectedFileId,
+                                                volume: setting.volume,
+                                            };
+                                            setOverride(setting.id, override);
+                                        });
+                                    }}
+                                />
+                            ));
                         }
 
                         showToast("Settings imported successfully!");
@@ -450,13 +486,16 @@ const settings = definePluginSettings({
                 }
 
                 if (allFiles.size > usedFiles.size) {
-                    const includeAll = await Alerts.confirm({
-                        title: "Some of files are unused",
-                        body: "Some of the files are unused in your overrides. Do you want to include them in the export output?",
-                        confirmText: "Yes",
-                        cancelText: "No",
-                    });
-
+                    const includeAll = await new Promise((resolve: (value: boolean) => void) => openModal(props => (
+                        <ConfirmModal
+                            {...props}
+                            title="Some of files are unused"
+                            subtitle={"Some of the files are unused in your overrides. Do you want to include them in the export output?"}
+                            confirmText="Yes"
+                            cancelText="No"
+                            onConfirm={() => { resolve(true); }}
+                        />
+                    )));
                     if (includeAll) usedFiles = allFiles;
                 }
 
@@ -498,27 +537,7 @@ const settings = definePluginSettings({
                             <Button
                                 disabled={Object.keys(files).length === 0}
                                 variant="dangerPrimary"
-                                onClick={() => {
-                                    Alerts.show({
-                                        title: "Are you sure?",
-                                        body: `This will remove ${Object.keys(files).length} file${Object.keys(files).length !== 1 ? "s" : ""} imported into the plugin.`,
-                                        async onConfirm() {
-                                            await AudioStore.clearStore();
-                                            dataUriCache.clear();
-                                            update();
-                                            await loadFiles();
-                                            allSoundTypes.forEach(type => {
-                                                const override = getOverride(type.id);
-                                                override.selectedFileId = undefined;
-                                                setOverride(type.id, override);
-                                            });
-                                            showToast("Files removed successfully.");
-                                        },
-                                        confirmText: "Do it!",
-                                        confirmColor: "vc-notification-log-danger-btn",
-                                        cancelText: "Nevermind"
-                                    });
-                                }}
+                                onClick={removeFilesModal}
                             >
                                 Remove All</Button>
                             <Button variant="overlayPrimary" onClick={() => {
