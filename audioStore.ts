@@ -10,6 +10,7 @@ import { Logger } from "@utils/Logger";
 const STORAGE_KEY = "CustomSounds";
 const METADATA_KEY = "CustomSounds_Metadata";
 
+const BASE64_OVERHEAD = 1.37;
 const DEFAULT_MAX_FILE_SIZE_MB = 15;
 let maxFileSizeMB = DEFAULT_MAX_FILE_SIZE_MB;
 
@@ -96,8 +97,8 @@ export async function importAudioData(data: StoredAudioFile): Promise<[StoredAud
     const { name, type, dataUri } = data;
 
     const maxBytes = maxFileSizeMB * 1024 * 1024;
-    if (dataUri.length > maxBytes) {
-        const fileMB = (dataUri.length / (1024 * 1024)).toFixed(1);
+    if (dataUri.length / BASE64_OVERHEAD > maxBytes) {
+        const fileMB = (dataUri.length / (1024 * 1024) / BASE64_OVERHEAD).toFixed(1);
         throw new Error(`File "${name}" is too large (${fileMB}MB). Maximum size is ${maxFileSizeMB}MB.`);
     }
 

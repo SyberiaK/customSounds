@@ -26,6 +26,8 @@ import { ExportedAudioFile, makeEmptyOverride, SettingsExport, SOUND_TYPES, Soun
 
 // todo: is aac actually supported in any browser?
 const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "m4a", "aac", "flac", "webm", "wma", "mp4", "opus"];
+const MAX_FILE_SIZE_MB = 30; // 320 kbps = 12:30 of music, there is no way you'd need more
+
 const audioExtensionsString = AUDIO_EXTENSIONS.map(v => `.${v}`).join(",");
 const audioExtensionsFormattedString = AUDIO_EXTENSIONS.map(v => `.${v}`).join(", ");
 
@@ -165,15 +167,6 @@ const soundSettings = Object.fromEntries(
     ])
 );
 
-// todo: in what scenarios is that even useful?? just set a hard cap brah
-const fileSizeOptions = [
-    { value: 5, label: "5 MB (Conservative)" },
-    { value: 15, label: "15 MB (Default)" },
-    { value: 30, label: "30 MB (Large)" },
-    { value: 50, label: "50 MB (Very Large)" },
-    { value: 100, label: "100 MB (Extreme - Use with caution!)" },
-];
-
 function SkipFileModal({ modalProps, filename, resolve }: { modalProps: RenderModalProps; filename: string; resolve: (value: [boolean, boolean]) => void; }) {
     const [repeatForAll, setRepeatForAll] = React.useState(false);
     return (
@@ -202,16 +195,6 @@ function resolveSkipFileModal(filename: string) {
 
 const settings = definePluginSettings({
     ...soundSettings,
-    maxFileSize: {
-        type: OptionType.SELECT,
-        description: "Larger uploads use more memory, take more time to process and may cause performance issues or crashes on lower-end devices. Increase at your own risk!",
-        options: fileSizeOptions,
-        default: 15,
-        onChange: (value: number) => {
-            AudioStore.setMaxFileSizeMB(value);
-            dataUriCache.setSizeLimit(value);
-        }
-    },
     resetSeasonalSoundsOnStartup: {
         type: OptionType.BOOLEAN,
         description: "Any sound set to a Halloween/Winter variant will be changed back to Default when the plugin loads.",
@@ -675,7 +658,7 @@ export default definePlugin({
 
     async start() {
         try {
-            const maxSize = settings.store.maxFileSize ?? 15;
+            const maxSize = MAX_FILE_SIZE_MB;
             AudioStore.setMaxFileSizeMB(maxSize);
             dataUriCache.setSizeLimit(maxSize);
 
@@ -699,5 +682,8 @@ export default definePlugin({
         } catch (error) {
             logger.error("Startup error:", error);
         }
+    },
+    async stop() {
+        dataUriCache.clear();
     }
 });

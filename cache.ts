@@ -8,8 +8,8 @@ const MAX_FILES_CACHED_AT_MAX_SIZE = 5;
 const BASE64_OVERHEAD = 1.37;
 const CACHE_SIZE_MULTIPLIER = BASE64_OVERHEAD * MAX_FILES_CACHED_AT_MAX_SIZE;
 
-const MIN_CACHE_SIZE_MB_CAP = 5;
-const MAX_CACHE_SIZE_MB_CAP = 500;
+const MIN_CACHE_SIZE_MB = 5;
+const MAX_CACHE_SIZE_MB = 30 * BASE64_OVERHEAD;
 
 /*
  * LRU-style cache with dynamic size limit based on max file size setting
@@ -21,12 +21,12 @@ export class LRU {
 
     constructor() {
         this.cache = new Map();
-        this.setSizeLimit(100);
+        this.setSizeLimit(MIN_CACHE_SIZE_MB);
     }
 
     setSizeLimit(maxFileSizeMB: number): void {
         const calculatedSize = Math.round(maxFileSizeMB * CACHE_SIZE_MULTIPLIER);
-        this._maxSize = Math.min(Math.max(calculatedSize, MIN_CACHE_SIZE_MB_CAP), MAX_CACHE_SIZE_MB_CAP) * 1024 * 1024;
+        this._maxSize = Math.min(Math.max(calculatedSize, MIN_CACHE_SIZE_MB), MAX_CACHE_SIZE_MB) * 1024 * 1024;
     }
 
     set(fileId: string, dataUri: string): void {
