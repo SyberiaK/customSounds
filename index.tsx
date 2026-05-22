@@ -22,7 +22,7 @@ import { ConfirmModal, openModal, React, showToast, TextInput, Toasts, UserStore
 import * as AudioStore from "./audioStore";
 import { LRU } from "./cache";
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
-import { ExportedAudioFile, makeEmptyOverride, SEASONAL_SOUNDS, SettingsExport, SOUND_TYPES, SoundOverride } from "./types";
+import { ExportedAudioFile, makeEmptyOverride, SettingsExport, SOUND_TYPES, SoundOverride } from "./types";
 
 // todo: is aac actually supported in any browser?
 const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "m4a", "aac", "flac", "webm", "wma", "mp4", "opus"];
@@ -56,29 +56,14 @@ function setOverride(id: string, override: SoundOverride): void {
 export function getCustomSoundURL(id: string): string | null {
     const override = getOverride(id);
 
-    if (!override?.enabled) return null;
+    if (!override?.enabled || override.selectedSound === "default") return null;
 
     if (override.selectedSound === "custom" && override.selectedFileId) {
-        // null => cache miss - shouldn't happen if preloading worked, but don't block
         return dataUriCache.get(override.selectedFileId) ?? null;
     }
 
-    if (override.selectedSound !== "default" && override.selectedSound !== "custom") {
-        if (override.selectedSound in SEASONAL_SOUNDS) return SEASONAL_SOUNDS[override.selectedSound];
-
-        const soundType = allSoundTypes.find(t => t.id === id);
-        if (!soundType?.seasonal) return null;
-
-        // is it even possible for `override.selectedSound` to be "halloween" or "winter"?
-        logger.debug(`${id} reached the seasonal check? soundType: ${soundType}`);
-        const seasonalId = soundType.seasonal.find(id => id.startsWith(`${override.selectedSound}_`));
-        if (seasonalId && seasonalId in SEASONAL_SOUNDS) {
-            logger.debug(`${id} passed the seasonal check?? soundType: ${soundType}, seasonalId: ${seasonalId}`);
-            return SEASONAL_SOUNDS[seasonalId];
-        }
-    }
-
-    return null;
+    const soundType = allSoundTypes.find(t => t.id === id);
+    return soundType?.seasonal?.[override.selectedSound] ?? null;
 }
 
 export async function ensureDataURICached(fileId: string): Promise<string | null> {
@@ -106,10 +91,11 @@ export async function refreshDataURI(id: string): Promise<void> {
 }
 
 function resetSeasonalOverridesToDefault(): void {
+    // todo: seems pointless as it resets user-demanded overrides for default ones
     let count = 0;
     for (const soundType of allSoundTypes) {
         const override = getOverride(soundType.id);
-        if (override.enabled && override.selectedSound in SEASONAL_SOUNDS) {
+        if (override.enabled && !["default", "custom"].includes(override.selectedSound)) {
             override.selectedSound = "default";
             setOverride(soundType.id, override);
             count++;

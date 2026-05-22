@@ -188,7 +188,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                         <Select
                             options={[
                                 { value: "default", label: "Default" },
-                                ...(type.seasonal?.map(id => ({ value: id, label: capitalizeWords(id) })) ?? []),
+                                ...(Object.keys(type.seasonal ?? {}).map(id => ({ value: id, label: capitalizeWords(id) }))),
                                 { value: "custom", label: "Custom" }
                             ]}
                             isSelected={v => v === override.selectedSound}

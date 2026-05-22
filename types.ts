@@ -7,13 +7,13 @@
 export interface SoundType {
     name: string;
     id: string;
-    seasonal?: string[];
+    seasonal?: { [id: string]: string; };
     derived?: string; // any sound with this is implemented by the plugin
 }
 
 export interface SoundOverride {
     enabled: boolean;
-    selectedSound: "default" | "custom" | (string & {}); // `keyof typeof SEASONAL_SOUNDS`?
+    selectedSound: "default" | "custom" | (string & {});
     volume: number;
     selectedFileId?: string;
 }
@@ -25,47 +25,30 @@ export interface SoundPlayer {
     stop(): void;
 }
 
-export const SEASONAL_SOUNDS = {
-    "halloween_call_calling": "https://canary.discord.com/assets/0950a7ea4f1dd037870b.mp3",
-    "winter_call_calling": "https://canary.discord.com/assets/7b945e7be3f86c5b7c82.mp3",
-    "halloween_call_ringing": "https://canary.discord.com/assets/1b883b366ae11a303b82.mp3",
-    "winter_call_ringing": "https://canary.discord.com/assets/e087eb83aaa4c43a44bc.mp3",
-    "call_ringing_beat": "https://canary.discord.com/assets/3b3a2f5f29b9cb656efb.mp3",
-    "call_ringing_snow_halation": "https://canary.discord.com/assets/99b1d8a6fe0b95e99827.mp3",
-    "call_ringing_snowsgiving": "https://canary.discord.com/assets/54527e70cf0ddaeff76f.mp3",
-    "halloween_deafen": "https://canary.discord.com/assets/c4aedda3b528df50221c.mp3",
-    "winter_deafen": "https://canary.discord.com/assets/9bb77985afdb60704817.mp3",
-    "halloween_disconnect": "https://canary.discord.com/assets/ca7d2e46cb5a16819aff.mp3",
-    "winter_disconnect": "https://canary.discord.com/assets/ec5d85405877c27caeda.mp3",
-    "halloween_message1": "https://canary.discord.com/assets/e386c839fb98675c6a79.mp3",
-    "halloween_mute": "https://canary.discord.com/assets/ee7fdadf4c714eed6254.mp3",
-    "winter_mute": "https://canary.discord.com/assets/6d7616e08466ab9f1c6d.mp3",
-    "halloween_undeafen": "https://canary.discord.com/assets/045e5b9608df1607e0cf.mp3",
-    "winter_undeafen": "https://canary.discord.com/assets/fa8da1499894ecac36c7.mp3",
-    "halloween_unmute": "https://canary.discord.com/assets/260c581568eacca03f7e.mp3",
-    "winter_unmute": "https://canary.discord.com/assets/9dbfb1c211e3815cd7b1.mp3",
-    "halloween_user_join": "https://canary.discord.com/assets/80cf806f45467a5898cd.mp3",
-    "winter_user_join": "https://canary.discord.com/assets/badc42c2a9063b4a962c.mp3",
-    "halloween_user_leave": "https://canary.discord.com/assets/f407ad88a1dc40541769.mp3",
-    "winter_user_leave": "https://canary.discord.com/assets/ec3d9eaea30b33e16da6.mp3"
-} as const; // for some reason discord also bundles "halloween_defean" and "halloween_undefean" which are exactly same as the sane named ones
-
 export const SOUND_TYPES: readonly SoundType[] = [
     { name: "Activity End", id: "activity_end" },
     { name: "Activity Launch", id: "activity_launch" },
     { name: "Activity User Join", id: "activity_user_join" },
     { name: "Activity User Left", id: "activity_user_left" },
-    { name: "Call Calling (outcoming)", id: "call_calling", seasonal: ["halloween_call_calling", "winter_call_calling"] },
+    // { name: "ASMR Message 1 (unused)", id: "asmr_message1" },
+    // { name: "Bit Message 1 (unused)", id: "bit_message1" },
+    // { name: "Bop Message 1 (unused)", id: "bop_message1" },
+    // { name: "Ducky Message 1 (unused)", id: "ducky_message1" },
+    // { name: "Lofi Message 1 (unused)", id: "alofi_message1" },
     {
-        name: "Call Ringing (incoming)",
-        id: "call_ringing",
-        seasonal: [
-            "halloween_call_ringing",
-            "winter_call_ringing",
-            "call_ringing_beat",
-            "call_ringing_snow_halation",
-            "call_ringing_snowsgiving"
-        ]
+        name: "Call Calling (outcoming)", id: "call_calling", seasonal: {
+            "halloween_call_calling": "https://canary.discord.com/assets/0950a7ea4f1dd037870b.mp3",
+            "winter_call_calling": "https://canary.discord.com/assets/7b945e7be3f86c5b7c82.mp3",
+        }
+    },
+    {
+        name: "Call Ringing (incoming)", id: "call_ringing", seasonal: {
+            "halloween_call_ringing": "https://canary.discord.com/assets/1b883b366ae11a303b82.mp3",
+            "winter_call_ringing": "https://canary.discord.com/assets/e087eb83aaa4c43a44bc.mp3",
+            "call_ringing_beat": "https://canary.discord.com/assets/3b3a2f5f29b9cb656efb.mp3",
+            "call_ringing_snow_halation": "https://canary.discord.com/assets/99b1d8a6fe0b95e99827.mp3",
+            "call_ringing_snowsgiving": "https://canary.discord.com/assets/54527e70cf0ddaeff76f.mp3",
+        }
     },
     { name: "Camera Off", id: "camera_off" },
     { name: "Camera On", id: "camera_on" },
@@ -76,9 +59,19 @@ export const SOUND_TYPES: readonly SoundType[] = [
     { name: "DDR Left", id: "ddr-left" },
     { name: "DDR Right", id: "ddr-right" },
     { name: "DDR Up", id: "ddr-up" },
-    { name: "Deafen", id: "deafen", seasonal: ["halloween_deafen", "winter_deafen"] },
+    {
+        name: "Deafen", id: "deafen", seasonal: {
+            "halloween_deafen": "https://canary.discord.com/assets/c4aedda3b528df50221c.mp3",
+            "winter_deafen": "https://canary.discord.com/assets/9bb77985afdb60704817.mp3",
+        }
+    },
     { name: "Discodo", id: "discodo" },
-    { name: "Disconnect", id: "disconnect", seasonal: ["halloween_disconnect", "winter_disconnect"] },
+    {
+        name: "Disconnect", id: "disconnect", seasonal: {
+            "halloween_disconnect": "https://canary.discord.com/assets/ca7d2e46cb5a16819aff.mp3",
+            "winter_disconnect": "https://canary.discord.com/assets/ec5d85405877c27caeda.mp3",
+        }
+    },
     { name: "Hang Status Select", id: "hang_status_select" },
     // { name: "Human Man (unused)", id: "human_man" },
     { name: "Invited to Speak", id: "reconnect" },
@@ -86,20 +79,18 @@ export const SOUND_TYPES: readonly SoundType[] = [
     { name: "Mention 2 (@everyone)", id: "mention2" },
     { name: "Mention 3 (used in switching audio devices)", id: "mention3" },
     {
-        name: "Message 1",
-        id: "message1",
-        seasonal: [
-            "halloween_message1",
-            "asmr_message1",
-            "bit_message1",
-            "bop_message1",
-            "ducky_message1",
-            "lofi_message1",
-        ]
+        name: "Message 1", id: "message1", seasonal: {
+            "halloween_message1": "https://canary.discord.com/assets/e386c839fb98675c6a79.mp3",
+        }
     },
     { name: "Message 2 (unused?)", id: "message2" },
     { name: "Message 3 (unused?)", id: "message3" },
-    { name: "Mute", id: "mute", seasonal: ["halloween_mute", "winter_mute"] },
+    {
+        name: "Mute", id: "mute", seasonal: {
+            "halloween_mute": "https://canary.discord.com/assets/ee7fdadf4c714eed6254.mp3",
+            "winter_mute": "https://canary.discord.com/assets/6d7616e08466ab9f1c6d.mp3",
+        }
+    },
     { name: "Overlay Unlock", id: "overlayunlock" },
     { name: "Poggermode Achievement", id: "poggermode_achievement_unlock" },
     { name: "Poggermode Applause", id: "poggermode_applause" },
@@ -114,18 +105,33 @@ export const SOUND_TYPES: readonly SoundType[] = [
     { name: "Stream User Joined", id: "stream_user_joined" },
     { name: "Stream User Left", id: "stream_user_left" },
     { name: "Success", id: "success" },
-    { name: "Undeafen", id: "undeafen", seasonal: ["halloween_undeafen", "winter_undeafen"] },
-    { name: "Unmute", id: "unmute", seasonal: ["halloween_unmute", "winter_unmute"] },
-    { name: "User Join", id: "user_join", seasonal: ["halloween_user_join", "winter_user_join"] },
-    { name: "User Leave", id: "user_leave", seasonal: ["halloween_user_leave", "winter_user_leave"] },
+    {
+        name: "Undeafen", id: "undeafen", seasonal: {
+            "halloween_undeafen": "https://canary.discord.com/assets/045e5b9608df1607e0cf.mp3",
+            "winter_undeafen": "https://canary.discord.com/assets/fa8da1499894ecac36c7.mp3",
+        }
+    },
+    {
+        name: "Unmute", id: "unmute", seasonal: {
+            "halloween_unmute": "https://canary.discord.com/assets/260c581568eacca03f7e.mp3",
+            "winter_unmute": "https://canary.discord.com/assets/9dbfb1c211e3815cd7b1.mp3",
+        }
+    },
+    {
+        name: "User Join", id: "user_join", seasonal: {
+            "halloween_user_join": "https://canary.discord.com/assets/80cf806f45467a5898cd.mp3",
+            "winter_user_join": "https://canary.discord.com/assets/badc42c2a9063b4a962c.mp3",
+        }
+    },
+    {
+        name: "User Leave", id: "user_leave", seasonal: {
+            "halloween_user_leave": "https://canary.discord.com/assets/f407ad88a1dc40541769.mp3",
+            "winter_user_leave": "https://canary.discord.com/assets/ec3d9eaea30b33e16da6.mp3"
+        }
+    },
     { name: "User Mentioned (derived from Message 1)", id: "user_mentioned", derived: "message1" },
     { name: "User Moved", id: "user_moved" },
     { name: "Vibing Wumpus", id: "vibing_wumpus" },
-    { name: "Voice Filter off (unused?)", id: "voice_filter_off" },
-    { name: "Voice Filter on (unused?)", id: "voice_filter_on" },
-    { name: "Voice Filter swap (unused?)", id: "voice_filter_swap" },
-    { name: "Voice Filter loopback off (unused?)", id: "voice_filter_loopback_off" },
-    { name: "Voice Filter loopback on (unused?)", id: "voice_filter_loopback_on" },
 ] as const;
 
 export function makeEmptyOverride(): SoundOverride {
