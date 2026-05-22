@@ -5,7 +5,6 @@
  */
 
 import { get, set } from "@api/DataStore";
-import { Logger } from "@utils/Logger";
 
 const STORAGE_KEY = "CustomSounds";
 const METADATA_KEY = "CustomSounds_Metadata";
@@ -13,8 +12,6 @@ const METADATA_KEY = "CustomSounds_Metadata";
 const BASE64_OVERHEAD = 1.37;
 const DEFAULT_MAX_FILE_SIZE_MB = 15;
 let maxFileSizeMB = DEFAULT_MAX_FILE_SIZE_MB;
-
-const logger = new Logger("CustomSounds");
 
 export function setMaxFileSizeMB(sizeMB: number): void {
     maxFileSizeMB = sizeMB;

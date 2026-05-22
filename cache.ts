@@ -11,9 +11,6 @@ const CACHE_SIZE_MULTIPLIER = BASE64_OVERHEAD * MAX_FILES_CACHED_AT_MAX_SIZE;
 const MIN_CACHE_SIZE_MB = 5;
 const MAX_CACHE_SIZE_MB = 30 * BASE64_OVERHEAD;
 
-/*
- * LRU-style cache with dynamic size limit based on max file size setting
- */
 export class LRU {
     cache: Map<string, string>; // might make this generic but ehh
     private _size: number = 0;
