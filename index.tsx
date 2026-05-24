@@ -90,20 +90,6 @@ export async function refreshDataURI(id: string): Promise<void> {
     await ensureDataURICached(override.selectedFileId);
 }
 
-function resetSeasonalOverridesToDefault(): void {
-    // todo: seems pointless as it resets user-demanded overrides for default ones
-    let count = 0;
-    for (const soundType of allSoundTypes) {
-        const override = getOverride(soundType.id);
-        if (override.enabled && !["default", "custom"].includes(override.selectedSound)) {
-            override.selectedSound = "default";
-            setOverride(soundType.id, override);
-            count++;
-        }
-    }
-    if (count > 0) logger.info(`Reset ${count} seasonal sound(s) to default`);
-}
-
 async function preloadDataURIs(): Promise<void> {
     const fileIdsToPreload = new Set<string>(
         allSoundTypes
@@ -158,11 +144,6 @@ function resolveSkipFileModal(filename: string) {
 
 const settings = definePluginSettings({
     ...soundSettings,
-    resetSeasonalSoundsOnStartup: {
-        type: OptionType.BOOLEAN,
-        description: "Any sound set to a Halloween/Winter variant will be changed back to Default when the plugin loads.",
-        default: true
-    },
     overrides: {
         type: OptionType.COMPONENT,
         description: "",
@@ -623,10 +604,6 @@ export default definePlugin({
             const maxSize = MAX_FILE_SIZE_MB;
             AudioStore.setMaxFileSizeMB(maxSize);
             dataUriCache.setSizeLimit(maxSize);
-
-            if (settings.store.resetSeasonalSoundsOnStartup) {
-                resetSeasonalOverridesToDefault();
-            }
 
             const migratedFiles = await AudioStore.migrateStorage();
             if (migratedFiles) {
