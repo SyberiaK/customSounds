@@ -122,39 +122,6 @@ async function preloadDataURIs(): Promise<void> {
     logger.info(`Preloaded ${fileIdsToPreload.size} custom sounds`);
 }
 
-export async function debugCustomSounds(): Promise<void> {
-    // todo: remove this function, all info can already be extracted with the console
-    logger.info("=== DEBUG INFO ===");
-    logger.info(`Max file size: ${AudioStore.getMaxFileSizeMB()}MB`);
-    logger.info(`Max cache size: ${Math.round(dataUriCache.maxSize() / (1024 * 1024))}MB`);
-
-    const storageInfo = await AudioStore.getStorageInfo();
-    logger.info(`Stored files: ${storageInfo.fileCount}, Total size: ${storageInfo.totalSizeKB}KB`);
-    logger.info(`Memory cache: ${dataUriCache.size()} items, ${Math.round(dataUriCache.size() / 1024)}KB`);
-
-    let enabledCount = 0;
-    let customSoundCount = 0;
-    for (const soundType of allSoundTypes) {
-        const override = getOverride(soundType.id);
-        if (override.enabled) {
-            enabledCount++;
-            if (override.selectedSound === "custom") {
-                customSoundCount++;
-            }
-        }
-    }
-
-    logger.info(`Enabled overrides: ${enabledCount} (${customSoundCount} custom)`);
-
-    const metadata = await AudioStore.getAllAudioMetadata();
-    const filesData: string = Object.entries(metadata)
-        .map(([id, file]) => `  - ${file.name} (${Math.round(file.size / 1024)}KB) [${id}]`)
-        .join("\n");
-
-    logger.info("Audio files:\n" + filesData);
-    logger.info("=== END DEBUG ===");
-}
-
 const soundSettings = Object.fromEntries(
     allSoundTypes.map(type => [
         type.id,
@@ -503,12 +470,6 @@ const settings = definePluginSettings({
                                 onClick={removeFilesModal}
                             >
                                 Remove All</Button>
-                            <Button variant="overlayPrimary" onClick={() => {
-                                debugCustomSounds();
-                                showToast("Debug info printed in the console.");
-                            }}
-                            >
-                                Debug</Button>
                             <input
                                 ref={audioFilesInputRef}
                                 type="file"
@@ -651,7 +612,6 @@ export default definePlugin({
     getCustomSoundURL,
     refreshDataURI,
     ensureDataURICached,
-    debugCustomSounds,
     mentionsEveryone,
     mentionsMe,
     startAt: StartAt.Init,

@@ -243,17 +243,3 @@ async function generateDataURI(buffer: ArrayBuffer, type: string, name: string):
         reader.readAsDataURL(blob);
     });
 }
-
-export async function getStorageInfo(): Promise<{ fileCount: number; totalSizeKB: number; }> {
-    const metadata = await getAllAudioMetadata();
-    let totalSize = 0;
-
-    for (const file of Object.values(metadata)) {
-        totalSize += file.size || 0;
-    }
-
-    return {
-        fileCount: Object.keys(metadata).length,
-        totalSizeKB: Math.round(totalSize / 1024)
-    };
-}
