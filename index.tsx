@@ -14,7 +14,7 @@ import { Devs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
 import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
-import { saveFile } from "@utils/web";
+import { chooseFile, saveFile } from "@utils/web";
 import { MessageJSON, RenderModalProps } from "@vencord/discord-types";
 import { ConfirmModal, openModal, React, showToast, TextInput, Toasts, UserStore } from "@webpack/common";
 
@@ -27,8 +27,7 @@ import { ExportedAudioFile, makeEmptyOverride, SettingsExport, SOUND_TYPES, Soun
 const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "m4a", "aac", "flac", "webm", "wma", "mp4", "opus"];
 const MAX_FILE_SIZE_MB = 30; // 320 kbps = 12:30 of music, there is no way you'd need more
 
-const audioExtensionsString = AUDIO_EXTENSIONS.map(v => `.${v}`).join(",");
-const audioExtensionsFormattedString = AUDIO_EXTENSIONS.map(v => `.${v}`).join(", ");
+const audioExtensionsString = AUDIO_EXTENSIONS.map(v => `.${v}`).join(", ");
 
 const cl = classNameFactory("vc-custom-sounds-");
 
@@ -106,14 +105,12 @@ function resetSeasonalOverridesToDefault(): void {
 }
 
 async function preloadDataURIs(): Promise<void> {
-    const fileIdsToPreload = new Set<string>();
-
-    for (const soundType of allSoundTypes) {
-        const override = getOverride(soundType.id);
-        if (override?.enabled && override.selectedSound === "custom" && override.selectedFileId) {
-            fileIdsToPreload.add(override.selectedFileId);
-        }
-    }
+    const fileIdsToPreload = new Set<string>(
+        allSoundTypes
+            .map(soundType => getOverride(soundType.id))
+            .filter(override => override?.enabled && override.selectedSound === "custom" && override.selectedFileId)
+            .map(override => override.selectedFileId!)
+    );
 
     if (fileIdsToPreload.size === 0) return;
     for (const fileId of fileIdsToPreload) await ensureDataURICached(fileId);
@@ -173,8 +170,7 @@ const settings = definePluginSettings({
             const [searchQuery, setSearchQuery] = React.useState("");
             const [files, setFiles] = React.useState<Record<string, AudioStore.AudioFileMetadata>>({});
             const [filesLoaded, setFilesLoaded] = React.useState(false);
-            const audioFilesInputRef = React.useRef<HTMLInputElement>(null);
-            const settingsFileInputRef = React.useRef<HTMLInputElement>(null);
+            const audioFilesInputRef = React.useRef<HTMLInputElement>(null); // todo: implement chooseFiles?
 
             const loadFiles = React.useCallback(async () => {
                 const metadata = await AudioStore.getAllAudioMetadata();
@@ -233,7 +229,7 @@ const settings = definePluginSettings({
 
                     const fileExtension = file.name.split(".").pop()?.toLowerCase();
                     if (!fileExtension || !AUDIO_EXTENSIONS.includes(fileExtension)) {
-                        showToast(`Invalid file type of "${file.name}". Please upload only audio files (${audioExtensionsFormattedString}).`, Toasts.Type.FAILURE);
+                        showToast(`Invalid file type of "${file.name}". Please upload only audio files (${audioExtensionsString}).`, Toasts.Type.FAILURE);
                         continue;
                     }
                     filteredFiles.push(file);
@@ -275,15 +271,16 @@ const settings = definePluginSettings({
                 event.target.value = "";
             };
 
-            const handleSettingsUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-                const file = event.target.files?.[0];
+            const handleSettingsUpload = async () => {
+                const file = await chooseFile(".json");
 
                 if (!file) return;
 
                 const reader = new FileReader();
                 reader.onload = async (e: ProgressEvent<FileReader>) => {
+                    resetOverrides();
+
                     try {
-                        resetOverrides();
                         const imported: SettingsExport = JSON.parse(e.target?.result as string);
 
                         // have to keep track of those because `files` gets updated after
@@ -377,14 +374,17 @@ const settings = definePluginSettings({
                         }
 
                         showToast("Settings imported successfully!", Toasts.Type.SUCCESS);
-                    } catch (error) {
-                        logger.error("Error importing settings:", error);
-                        showToast("Error importing settings. Check console for details.", Toasts.Type.FAILURE);
+                    } catch (e: unknown) {
+                        if (e instanceof SyntaxError) {
+                            showToast("Error importing settings: the file is not valid JSON.", Toasts.Type.FAILURE);
+                        } else {
+                            showToast("Error importing settings. Check console for details.", Toasts.Type.FAILURE);
+                            logger.error("Error importing settings:", e);
+                        }
                     }
                 };
 
                 reader.readAsText(file);
-                event.target.value = "";
             };
 
             const downloadSettings = async () => {
@@ -490,7 +490,7 @@ const settings = definePluginSettings({
                     <div className={cl("section")}>
                         <Heading>Overrides</Heading>
                         <div className={cl("buttons")}>
-                            <Button variant="primary" onClick={() => settingsFileInputRef.current?.click()}>Import</Button>
+                            <Button variant="primary" onClick={handleSettingsUpload}>Import</Button>
                             <Button variant="secondary" onClick={downloadSettings}>Export</Button>
                             <Button variant="dangerPrimary" onClick={() => {
                                 resetOverrides();
@@ -498,13 +498,6 @@ const settings = definePluginSettings({
                             }}
                             >
                                 Reset All</Button>
-                            <input
-                                ref={settingsFileInputRef}
-                                type="file"
-                                accept=".json"
-                                style={{ display: "none" }}
-                                onChange={handleSettingsUpload}
-                            />
                         </div>
                     </div>
                     <div className={cl("search")}>
@@ -539,7 +532,9 @@ const settings = definePluginSettings({
                                         onChange={async () => {
                                             setOverride(type.id, currentOverride);
 
-                                            if (currentOverride.enabled && currentOverride.selectedSound === "custom" && currentOverride.selectedFileId) {
+                                            if (currentOverride.enabled &&
+                                                currentOverride.selectedSound === "custom" &&
+                                                currentOverride.selectedFileId) {
                                                 await ensureDataURICached(currentOverride.selectedFileId);
                                             }
                                         }}

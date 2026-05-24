@@ -9,6 +9,7 @@ import { Card } from "@components/Card";
 import { FormSwitch } from "@components/FormSwitch";
 import { Heading } from "@components/Heading";
 import { classNameFactory } from "@utils/css";
+import { Logger } from "@utils/Logger";
 import { useForceUpdater } from "@utils/react";
 import { makeRange } from "@utils/types";
 import { findByCodeLazy } from "@webpack";
@@ -18,6 +19,7 @@ import * as AudioStore from "./audioStore";
 import { SoundOverride, SoundPlayer, SoundType } from "./types";
 
 const cl = classNameFactory("vc-custom-sounds-");
+const logger = new Logger("CustomSounds");
 const playSound: (id: string) => SoundPlayer = findByCodeLazy(".playWithListener().then");
 
 const capitalizeWords = (str: string) =>
@@ -33,7 +35,6 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
     const update = useForceUpdater();
     const sound = React.useRef<SoundPlayer | null>(null);
 
-    // Cleanup audio on unmount to prevent memory leaks
     React.useEffect(() => {
         return () => {
             sound.current?.stop();
@@ -60,7 +61,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
             sound.current = playSound(type.derived ?? type.id);
             return;
         }
-        if (selectedSound !== "custom") { // seasonal
+        if (selectedSound !== "custom") {
             sound.current = playSound(selectedSound);
             return;
         }
@@ -69,36 +70,36 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
             return;
         }
 
+        const dataUri = await AudioStore.getAudioDataURI(selectedFileId);
+
+        if (!dataUri || !(
+            dataUri.startsWith("data:audio/") || dataUri.startsWith("data:video/")
+        )) {
+            showToast("No custom sound file available for preview");
+            return;
+        }
+
+        const mimeMatch = dataUri.match(/^data:(audio\/[^;,]+)/i);
+        const mimeType = mimeMatch ? mimeMatch[1] : "audio/mpeg";
+        const testEl = document.createElement("audio");
+        if (testEl.canPlayType(mimeType) === "") {
+            showToast("Your browser doesn't support this format. Try re-uploading as MP3 or WAV.");
+            return;
+        }
+
+        const audio = new Audio(dataUri);
+        audio.volume = override.volume / 100;
+
+        audio.onerror = () => {
+            const msg = audio.error?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
+                ? "Format not supported by browser. Try MP3 or WAV."
+                : "Could not play file. It may be corrupted or in an unsupported format.";
+            showToast(msg);
+            logger.error("Error handled in previewSound:", audio.error?.message);
+        };
+
         try {
-            const dataUri = await AudioStore.getAudioDataURI(selectedFileId);
-
-            if (!dataUri || !(
-                dataUri.startsWith("data:audio/") || dataUri.startsWith("data:video/")
-            )) {
-                showToast("No custom sound file available for preview");
-                return;
-            }
-
-            // Check if browser supports this format (e.g. WMA is not supported in Chrome/Firefox)
-            const mimeMatch = dataUri.match(/^data:(audio\/[^;,]+)/i);
-            const mimeType = mimeMatch ? mimeMatch[1] : "audio/mpeg";
-            const testEl = document.createElement("audio");
-            if (testEl.canPlayType(mimeType) === "") {
-                showToast("Your browser doesn't support this format. Try re-uploading as MP3 or WAV.");
-                return;
-            }
-
-            const audio = new Audio(dataUri);
-            audio.volume = override.volume / 100;
-
-            audio.onerror = () => {
-                const msg = audio.error?.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED
-                    ? "Format not supported by browser. Try MP3 or WAV."
-                    : "Could not play file. It may be corrupted or in an unsupported format.";
-                showToast(msg);
-                console.debug("[CustomSounds] Error handled in previewSound:", audio.error?.message);
-            };
-
+            // todo: can this even error out?
             await audio.play();
             sound.current = {
                 play: () => audio.play(),
@@ -110,30 +111,24 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                 loop: () => { audio.loop = true; }
             };
         } catch (error: unknown) {
-            const err = error as Error & { name?: string; };
-            console.error("[CustomSounds] Error in previewSound:", error);
-            if (err?.name === "NotSupportedError" || err?.message?.includes("supported source")) {
-                showToast("Format not supported by your browser. Try re-uploading as MP3 or WAV.");
-            } else {
-                showToast("Could not play sound. File may be corrupted or in an unsupported format.");
-            }
+            const err = error as Error;
+            const msg = err?.name === "NotSupportedError" || err?.message?.includes("supported source")
+                ? "Format not supported by browser. Try MP3 or WAV."
+                : "Could not play file. It may be corrupted or in an unsupported format.";
+            showToast(msg);
+            logger.error("Error in previewSound:", error);
         }
     };
 
     const deleteFile = async (id: string) => {
-        try {
-            await AudioStore.deleteAudio(id);
+        await AudioStore.deleteAudio(id);
 
-            if (override.selectedFileId === id) {
-                override.selectedFileId = undefined;
-                await saveAndNotify();
-            }
-            onFilesChange();
-            showToast("File deleted successfully");
-        } catch (error) {
-            console.error("[CustomSounds] Error deleting file:", error);
-            showToast("Error deleting file. Check console for details.");
+        if (override.selectedFileId === id) {
+            override.selectedFileId = undefined;
+            await saveAndNotify();
         }
+        onFilesChange();
+        showToast("File deleted successfully");
     };
 
     const customFileOptions = Object.entries(files)
