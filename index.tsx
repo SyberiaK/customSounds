@@ -13,7 +13,6 @@ import { Paragraph } from "@components/Paragraph";
 import { Devs } from "@utils/constants";
 import { classNameFactory } from "@utils/css";
 import { Logger } from "@utils/Logger";
-import { useForceUpdater } from "@utils/react";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
 import { saveFile } from "@utils/web";
 import { MessageJSON, RenderModalProps } from "@vencord/discord-types";
@@ -174,19 +173,13 @@ const settings = definePluginSettings({
             const [searchQuery, setSearchQuery] = React.useState("");
             const [files, setFiles] = React.useState<Record<string, AudioStore.AudioFileMetadata>>({});
             const [filesLoaded, setFilesLoaded] = React.useState(false);
-            const update = useForceUpdater();
             const audioFilesInputRef = React.useRef<HTMLInputElement>(null);
             const settingsFileInputRef = React.useRef<HTMLInputElement>(null);
 
             const loadFiles = React.useCallback(async () => {
-                try {
-                    const metadata = await AudioStore.getAllAudioMetadata();
-                    setFiles(metadata);
-                    setFilesLoaded(true);
-                } catch (error) {
-                    logger.error("Error loading audio metadata:", error);
-                    setFilesLoaded(true);
-                }
+                const metadata = await AudioStore.getAllAudioMetadata();
+                setFiles(metadata);
+                setFilesLoaded(true);
             }, []);
 
             React.useEffect(() => {
@@ -204,8 +197,7 @@ const settings = definePluginSettings({
                         {...props}
                         title="Are you sure?"
                         subtitle={`This will remove ${Object.keys(files).length} file${Object.keys(files).length !== 1 ? "s" : ""} imported into the plugin.`}
-                        confirmText="Do it!"
-                        cancelText="Nevermind"
+                        confirmText="Remove"
                         onConfirm={async () => {
                             await AudioStore.clearStore();
                             dataUriCache.clear();
@@ -217,7 +209,6 @@ const settings = definePluginSettings({
                                 setOverride(type.id, override);
                             });
 
-                            update();
                             await loadFiles();
 
                             showToast("Files removed successfully.", Toasts.Type.SUCCESS);
@@ -280,7 +271,6 @@ const settings = definePluginSettings({
                 for (const [data] of audioDataToSave) await ensureDataURICached(data.id);
 
                 await loadFiles();
-                update();
                 showToast(`Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`, Toasts.Type.SUCCESS);
                 event.target.value = "";
             };
@@ -296,7 +286,7 @@ const settings = definePluginSettings({
                         resetOverrides();
                         const imported: SettingsExport = JSON.parse(e.target?.result as string);
 
-                        // have to keep track of those because `files` doesn't get updated in time?
+                        // have to keep track of those because `files` gets updated after
                         const newlyAddedAudioIDs: string[] = [];
                         if (Array.isArray(imported?.files)) {
                             const audioDataToSave: [AudioStore.StoredAudioFile, AudioStore.AudioFileMetadata][] = [];
@@ -304,9 +294,9 @@ const settings = definePluginSettings({
                             let doSkip = false;
                             let repeatForAll = false;
                             for (const importedFile of imported.files) {
-                                try {
-                                    if (!importedFile?.name || !importedFile?.dataUri) continue;
+                                if (!importedFile?.name || !importedFile?.dataUri) continue;
 
+                                try {
                                     const [data, metadata] = await AudioStore.importAudioData(importedFile);
 
                                     if (files[data.id]) {
@@ -336,7 +326,6 @@ const settings = definePluginSettings({
                             for (const [data] of audioDataToSave) await ensureDataURICached(data.id);
 
                             await loadFiles();
-                            update();
 
                             showToast(`Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`, Toasts.Type.SUCCESS);
                         }
@@ -367,7 +356,8 @@ const settings = definePluginSettings({
                                 <ConfirmModal
                                     {...props}
                                     title="Audio files not found"
-                                    subtitle={`Seems like some custom audio files are missing: ${filesMissing.map(setting => setting.selectedFileId).join(", ")}. Do you want to add missing files?`}
+                                    subtitle={`Seems like some custom audio files are missing: ${filesMissing.map(setting => setting.selectedFileId).join(", ")}.
+                                        Do you want to add missing files?`}
                                     confirmText="Yes"
                                     cancelText="No"
                                     onConfirm={() => { audioFilesInputRef.current?.click(); }}

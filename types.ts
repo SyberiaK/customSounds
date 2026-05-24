@@ -7,7 +7,7 @@
 export interface SoundType {
     name: string;
     id: string;
-    seasonal?: { [id: string]: string; };
+    seasonal?: Record<string, string>;
     derived?: string; // any sound with this is implemented by the plugin
 }
 
