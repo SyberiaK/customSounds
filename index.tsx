@@ -419,6 +419,23 @@ const settings = definePluginSettings({
                     if (includeAll) usedFiles = allFiles;
                 }
 
+                const totalSize = Array.from(usedFiles).reduce((acc, val) => acc + files[val].size, 0);
+                if (totalSize > 100 * 1024 * 1024) {
+                    const proceed = await new Promise((resolve: (value: boolean) => void) => openModal(props => (
+                        <ConfirmModal
+                            {...props}
+                            title="The export is too heavy"
+                            subtitle={`The total size of exported files exceeds 100MB (${(totalSize / 1024 / 1024).toFixed(1)}MB).
+                                    Exporting (and importing) so much data might take a while to process or evem cause your Discord client to crash.
+                                    Do you wish to proceed?`}
+                            confirmText="Yes"
+                            cancelText="No"
+                            onConfirm={() => { resolve(true); }}
+                        />
+                    )));
+                    if (!proceed) return;
+                }
+
                 const audioData = await AudioStore.getAllAudio();
                 const filesToBundle: ExportedAudioFile[] = [];
                 for (const fileId of usedFiles) {
