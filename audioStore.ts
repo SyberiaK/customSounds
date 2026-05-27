@@ -150,7 +150,7 @@ export async function clearStore(): Promise<void> {
 async function generateDataURI(buffer: ArrayBuffer, type: string, name: string): Promise<string> {
     let mimeType = type || "audio/mpeg";
 
-    if (!mimeType || mimeType === "application/octet-stream") {
+    if (!mimeType || mimeType === "application/octet-stream" || mimeType.startsWith("video")) {
         if (name) {
             const extension = name.split(".").pop()?.toLowerCase();
             switch (extension) {

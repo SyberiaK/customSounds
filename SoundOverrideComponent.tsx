@@ -72,9 +72,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
 
         const dataUri = await AudioStore.getAudioDataURI(selectedFileId);
 
-        if (!dataUri || !(
-            dataUri.startsWith("data:audio/") || dataUri.startsWith("data:video/")
-        )) {
+        if (!dataUri || !dataUri.startsWith("data:audio/")) {
             showToast("No custom sound file available for preview");
             return;
         }
