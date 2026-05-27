@@ -97,7 +97,6 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
         };
 
         try {
-            // todo: can this even error out?
             await audio.play();
             sound.current = {
                 play: () => audio.play(),
@@ -151,12 +150,13 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
             {override.enabled && (
                 <div className={cl("card-content")}>
                     <div className={cl("buttons")}>
-                        <Button variant="positive" onClick={previewSound}>Preview</Button>
+                        <Button variant="positive" size="iconOnly" onClick={previewSound}>▶</Button>
                         <Button
                             variant="dangerPrimary"
+                            size="iconOnly"
                             onClick={() => sound.current?.stop()}
                         >
-                            Stop
+                            ⏹
                         </Button>
                     </div>
                     <div className={cl("card-option")}>
