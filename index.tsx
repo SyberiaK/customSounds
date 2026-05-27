@@ -609,18 +609,6 @@ export default definePlugin({
         AudioStore.setMaxFileSizeMB(MAX_FILE_SIZE_MB);
         dataUriCache.setSizeLimit(MAX_FILE_SIZE_MB);
 
-        const migratedFiles = await AudioStore.migrateStorage();
-        if (migratedFiles) {
-            allSoundTypes.forEach(type => {
-                const override = getOverride(type.id);
-                if (override.selectedFileId) {
-                    const newId = migratedFiles[override.selectedFileId];
-                    override.selectedFileId = newId ?? override.selectedFileId;
-                    setOverride(type.id, override);
-                }
-            });
-        }
-
         await preloadDataURIs();
     },
     async stop() {
