@@ -33,6 +33,7 @@ export interface AudioFileMetadata {
     name: string;
     type: string;
     size: number;
+    checksum: string | undefined;
 }
 
 type MetadataStore = Record<string, AudioFileMetadata>;
@@ -72,6 +73,14 @@ export async function saveAudioData(audioData: [StoredAudioFile, AudioFileMetada
     await setMetadataStore(metadataStore);
 }
 
+async function getStringHash(input: string) {
+    const hashBuffer = await window.crypto.subtle.digest("SHA-256", new TextEncoder().encode(input));
+
+    return Array.from(new Uint8Array(hashBuffer))
+        .map(item => item.toString(16).padStart(2, "0"))
+        .join("");
+}
+
 export async function processAudioFile(file: File): Promise<[StoredAudioFile, AudioFileMetadata]> {
     const maxBytes = maxFileSizeMB * 1024 * 1024;
     if (file.size > maxBytes) {
@@ -100,6 +109,7 @@ export async function importAudioData(data: StoredAudioFile): Promise<[StoredAud
     }
 
     const id = data.id || name;
+    const checksum = await getStringHash(dataUri);
 
     return [
         {
@@ -112,7 +122,8 @@ export async function importAudioData(data: StoredAudioFile): Promise<[StoredAud
             id,
             name,
             type,
-            size: dataUri.length
+            size: dataUri.length,
+            checksum
         }
     ];
 }

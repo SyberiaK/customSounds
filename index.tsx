@@ -102,7 +102,7 @@ async function preloadDataURIs(): Promise<void> {
     for (const fileId of fileIdsToPreload) await ensureDataURICached(fileId);
 }
 
-function SkipFileModal({ modalProps, filename, resolve }: { modalProps: RenderModalProps; filename: string; resolve: (value: [boolean, boolean]) => void; }) {
+function ReplaceFileModal({ modalProps, filename, resolve }: { modalProps: RenderModalProps; filename: string; resolve: (value: [boolean, boolean]) => void; }) {
     const [repeatForAll, setRepeatForAll] = React.useState(false);
     return (
         <ConfirmModal
@@ -122,9 +122,9 @@ function SkipFileModal({ modalProps, filename, resolve }: { modalProps: RenderMo
     );
 }
 
-function resolveSkipFileModal(filename: string) {
+function resolveReplaceFileModal(filename: string) {
     return new Promise<[boolean, boolean]>(resolve => {
-        openModal(props => <SkipFileModal modalProps={props} filename={filename} resolve={resolve} />);
+        openModal(props => <ReplaceFileModal modalProps={props} filename={filename} resolve={resolve} />);
     });
 }
 
@@ -212,25 +212,23 @@ function SoundOverrides() {
         }
 
         const audioDataToSave: [AudioStore.StoredAudioFile, AudioStore.AudioFileMetadata][] = [];
-        let doSkip = false;
+        let doReplace = false;
         let repeatForAll = false;
 
         for (const file of filteredFiles) {
             try {
                 const [data, metadata] = await AudioStore.processAudioFile(file);
 
-                if (files[data.id]) {
-                    if (doSkip && repeatForAll) continue;
-
-                    const existingDataUri = await AudioStore.getAudioDataURI(data.id);
-                    if (existingDataUri === data.dataUri) continue;
+                if (files[metadata.id]) {
+                    if (!doReplace && repeatForAll) continue;
+                    if (files[metadata.id]?.checksum === metadata?.checksum) continue;
 
                     if (!repeatForAll) {
-                        [doSkip, repeatForAll] = await resolveSkipFileModal(data.name);
+                        [doReplace, repeatForAll] = await resolveReplaceFileModal(data.name);
                     }
                 }
 
-                if (!doSkip) audioDataToSave.push([data, metadata]);
+                if (doReplace) audioDataToSave.push([data, metadata]);
             } catch (error: any) {
                 logger.error("Upload error:", error);
                 const message = error.message ?? "Unknown error";
@@ -264,7 +262,7 @@ function SoundOverrides() {
                 if (Array.isArray(imported?.files)) {
                     const audioDataToSave: [AudioStore.StoredAudioFile, AudioStore.AudioFileMetadata][] = [];
 
-                    let doSkip = false;
+                    let doReplace = false;
                     let repeatForAll = false;
                     for (const importedFile of imported.files) {
                         if (!importedFile?.name || !importedFile?.dataUri) continue;
@@ -272,20 +270,18 @@ function SoundOverrides() {
                         try {
                             const [data, metadata] = await AudioStore.importAudioData(importedFile);
 
-                            if (files[data.id]) {
-                                if (doSkip && repeatForAll) continue;
-
-                                const dataUri = await AudioStore.getAudioDataURI(data.id);
-                                if (dataUri === data.dataUri) continue;
+                            if (files[metadata.id]) {
+                                if (!doReplace && repeatForAll) continue;
+                                if (files[metadata.id]?.checksum === metadata?.checksum) continue;
 
                                 if (!repeatForAll) {
-                                    [doSkip, repeatForAll] = await resolveSkipFileModal(data.name);
+                                    [doReplace, repeatForAll] = await resolveReplaceFileModal(metadata.name);
                                 }
                             }
 
-                            if (!doSkip) {
+                            if (doReplace) {
                                 audioDataToSave.push([data, metadata]);
-                                newlyAddedAudioIDs.push(data.id);
+                                newlyAddedAudioIDs.push(metadata.id);
                             }
                         } catch (error: any) {
                             logger.error("Import error:", error);
