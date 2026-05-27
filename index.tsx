@@ -99,23 +99,8 @@ async function preloadDataURIs(): Promise<void> {
             .map(override => override.selectedFileId!)
     );
 
-    if (fileIdsToPreload.size === 0) return;
     for (const fileId of fileIdsToPreload) await ensureDataURICached(fileId);
-
-    logger.info(`Preloaded ${fileIdsToPreload.size} custom sounds`);
 }
-
-const soundSettings = Object.fromEntries(
-    allSoundTypes.map(type => [
-        type.id,
-        {
-            type: OptionType.STRING,
-            description: `Override for ${type.name}`,
-            default: JSON.stringify(makeEmptyOverride()),
-            hidden: true
-        }
-    ])
-);
 
 function SkipFileModal({ modalProps, filename, resolve }: { modalProps: RenderModalProps; filename: string; resolve: (value: [boolean, boolean]) => void; }) {
     const [repeatForAll, setRepeatForAll] = React.useState(false);
@@ -124,8 +109,8 @@ function SkipFileModal({ modalProps, filename, resolve }: { modalProps: RenderMo
             {...modalProps}
             title="The file already exists"
             subtitle={`You already have a file named "${filename}" uploaded.`}
-            confirmText="Skip"
-            cancelText="Replace"
+            confirmText="Replace"
+            cancelText="Skip"
             checkboxProps={{
                 label: "Do for all",
                 checked: repeatForAll === true,
@@ -142,6 +127,18 @@ function resolveSkipFileModal(filename: string) {
         openModal(props => <SkipFileModal modalProps={props} filename={filename} resolve={resolve} />);
     });
 }
+
+const soundInternals = Object.fromEntries(
+    allSoundTypes.map(type => [
+        type.id,
+        {
+            type: OptionType.STRING,
+            description: `Override for ${type.name}`,
+            default: JSON.stringify(makeEmptyOverride()),
+            hidden: true
+        }
+    ])
+);
 
 function SoundOverrides() {
     const [searchQuery, setSearchQuery] = React.useState("");
@@ -373,7 +370,7 @@ function SoundOverrides() {
                 id: type.id,
                 enabled: override.enabled,
                 selectedSound: override.selectedSound,
-                selectedFileId: override.selectedFileId ?? undefined,
+                selectedFileId: override.selectedFileId ?? makeEmptyOverride().selectedFileId,
                 volume: override.volume
             };
         }).filter(o => o.enabled || o.selectedSound !== "default");
@@ -417,13 +414,9 @@ function SoundOverrides() {
         }
 
         const audioData = await AudioStore.getAllAudio();
-        const filesToBundle: ExportedAudioFile[] = [];
-        for (const fileId of usedFiles) {
-            const file = audioData[fileId];
-            if (!file?.dataUri) continue;
-
-            filesToBundle.push(file);
-        }
+        const filesToBundle: ExportedAudioFile[] = Array.from(usedFiles)
+            .filter(id => audioData[id]?.dataUri)
+            .map(id => audioData[id]);
 
         const exportPayload: SettingsExport = {
             overrides,
@@ -431,13 +424,11 @@ function SoundOverrides() {
         };
 
         showToast(`Exporting ${overrides.length} settings and ${filesToBundle.length} files...`);
-
-        const file = new File(
+        saveFile(new File(
             [JSON.stringify(exportPayload, null, 2)],
             "customSounds-settings.json",
             { type: "application/json" }
-        );
-        saveFile(file);
+        ));
     };
 
     const filteredSoundTypes = allSoundTypes.filter(type =>
@@ -528,7 +519,7 @@ function SoundOverrides() {
 }
 
 const settings = definePluginSettings({
-    ...soundSettings,
+    ...soundInternals,
     overrides: {
         type: OptionType.COMPONENT,
         description: "",

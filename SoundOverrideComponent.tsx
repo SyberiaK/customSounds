@@ -16,7 +16,7 @@ import { findByCodeLazy } from "@webpack";
 import { React, Select, showToast, Slider } from "@webpack/common";
 
 import * as AudioStore from "./audioStore";
-import { SoundOverride, SoundPlayer, SoundType } from "./types";
+import { makeEmptyOverride, SoundOverride, SoundPlayer, SoundType } from "./types";
 
 const cl = classNameFactory("vc-custom-sounds-");
 const logger = new Logger("CustomSounds");
@@ -124,7 +124,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
         await AudioStore.deleteAudio(id);
 
         if (override.selectedFileId === id) {
-            override.selectedFileId = undefined;
+            override.selectedFileId = makeEmptyOverride().selectedFileId;
             await saveAndNotify();
         }
         onFilesChange();
@@ -153,12 +153,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
             {override.enabled && (
                 <div className={cl("card-content")}>
                     <div className={cl("buttons")}>
-                        <Button
-                            variant="positive"
-                            onClick={previewSound}
-                        >
-                            Preview
-                        </Button>
+                        <Button variant="positive" onClick={previewSound}>Preview</Button>
                         <Button
                             variant="dangerPrimary"
                             onClick={() => sound.current?.stop()}

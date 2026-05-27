@@ -47,7 +47,7 @@ async function setMetadataStore(new_: MetadataStore): Promise<void> {
 }
 
 export async function getAudioDataURI(id: string): Promise<string | undefined> {
-    const all: AudioStore = await getAllAudio();
+    const all = await getAllAudio();
     return all?.[id]?.dataUri;
 }
 
@@ -60,10 +60,10 @@ async function setAudioStore(new_: AudioStore): Promise<void> {
 }
 
 export async function saveAudioData(audioData: [StoredAudioFile, AudioFileMetadata][]): Promise<void> {
-    const audioStore: AudioStore = await getAllAudio();
-    const metadataStore: MetadataStore = await getAllAudioMetadata();
+    const audioStore = await getAllAudio();
+    const metadataStore = await getAllAudioMetadata();
 
-    for (const [data, metadata] of audioData) { // processing files asyncronounsly makes no real difference
+    for (const [data, metadata] of audioData) {
         audioStore[metadata.id] = data;
         metadataStore[metadata.id] = metadata;
     }
@@ -118,15 +118,13 @@ export async function importAudioData(data: StoredAudioFile): Promise<[StoredAud
 }
 
 export async function deleteAudio(id: string): Promise<void> {
-    // Delete from audio store
-    const audioStore: AudioStore = await getAllAudio();
+    const audioStore = await getAllAudio();
     if (audioStore[id]) {
         delete audioStore[id];
         await setAudioStore(audioStore);
     }
 
-    // Delete from metadata store
-    const metadataStore: MetadataStore = await getAllAudioMetadata();
+    const metadataStore = await getAllAudioMetadata();
     if (metadataStore[id]) {
         delete metadataStore[id];
         await setMetadataStore(metadataStore);
