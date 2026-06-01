@@ -142,7 +142,7 @@ const soundInternals = Object.fromEntries(
 
 function SoundOverrides() {
     const [searchQuery, setSearchQuery] = React.useState("");
-    const [files, setFiles] = React.useState<Record<string, AudioStore.AudioFileMetadata>>({});
+    const [files, setFiles] = React.useState<Record<string, AudioStore.AudioMetadata>>({});
     const [filesLoaded, setFilesLoaded] = React.useState(false);
     const audioFilesInputRef = React.useRef<HTMLInputElement>(null); // todo: implement chooseFiles?
 
@@ -211,7 +211,7 @@ function SoundOverrides() {
             filteredFiles.push(file);
         }
 
-        const audioDataToSave: [AudioStore.StoredAudioFile, AudioStore.AudioFileMetadata][] = [];
+        const audioDataToSave: [AudioStore.AudioData, AudioStore.AudioMetadata][] = [];
         let doReplace = false;
         let repeatForAll = false;
 
@@ -229,9 +229,9 @@ function SoundOverrides() {
                 }
 
                 if (doReplace) audioDataToSave.push([data, metadata]);
-            } catch (error: any) {
-                logger.error("Upload error:", error);
-                const message = error.message ?? "Unknown error";
+            } catch (e) {
+                logger.error("Upload error:", e);
+                const message = e instanceof Error ? e.message : "Unknown error";
                 showToast(message.includes("too large") ? message : `Upload of "${file.name}" failed: ${message}`, Toasts.Type.FAILURE);
                 continue;
             }
@@ -260,7 +260,7 @@ function SoundOverrides() {
                 // have to keep track of those because `files` gets updated after
                 const newlyAddedAudioIDs: string[] = [];
                 if (Array.isArray(imported?.files)) {
-                    const audioDataToSave: [AudioStore.StoredAudioFile, AudioStore.AudioFileMetadata][] = [];
+                    const audioDataToSave: [AudioStore.AudioData, AudioStore.AudioMetadata][] = [];
 
                     let doReplace = false;
                     let repeatForAll = false;
@@ -283,9 +283,9 @@ function SoundOverrides() {
                                 audioDataToSave.push([data, metadata]);
                                 newlyAddedAudioIDs.push(metadata.id);
                             }
-                        } catch (error: any) {
-                            logger.error("Import error:", error);
-                            const message = error.message ?? "Unknown error";
+                        } catch (e) {
+                            logger.error("Import error:", e);
+                            const message = e instanceof Error ? e.message : "Unknown error";
                             showToast(message.includes("too large") ? message : `Import of "${importedFile.name}" failed: ${message}`, Toasts.Type.FAILURE);
                             continue;
                         }
@@ -346,7 +346,7 @@ function SoundOverrides() {
                 }
 
                 showToast("Settings imported successfully!", Toasts.Type.SUCCESS);
-            } catch (e: unknown) {
+            } catch (e) {
                 if (e instanceof SyntaxError) {
                     showToast("Error importing settings: the file is not valid JSON.", Toasts.Type.FAILURE);
                 } else {
@@ -383,7 +383,8 @@ function SoundOverrides() {
                 <ConfirmModal
                     {...props}
                     title="Some of files are unused"
-                    subtitle={"Some of the files are unused in your overrides. Do you want to include them in the export output?"}
+                    subtitle={`Some of the files are unused in your overrides.
+                                Do you want to include them in the export output?`}
                     confirmText="Yes"
                     cancelText="No"
                     onConfirm={() => { resolve(true); }}
@@ -393,14 +394,15 @@ function SoundOverrides() {
         }
 
         const totalSize = Array.from(usedFiles).reduce((acc, val) => acc + files[val].size, 0);
-        if (totalSize > HEAVY_EXPORT_THRESHOLD_MB * 1024 * 1024) { // tod
+        if (totalSize > HEAVY_EXPORT_THRESHOLD_MB * 1024 * 1024) {
             const proceed = await new Promise((resolve: (value: boolean) => void) => openModal(props => (
                 <ConfirmModal
                     {...props}
                     title="The export is too heavy"
                     subtitle={`The total size of exported files exceeds 100MB (${(totalSize / 1024 / 1024).toFixed(1)}MB).
-                                    Exporting (and importing) so much data might take a while to process or evem cause your Discord client to crash.
-                                    Do you wish to proceed?`}
+                                Exporting (and later on, importing) so much data might take a while to process
+                                or even cause your Discord client to crash.
+                                Do you wish to proceed?`}
                     confirmText="Yes"
                     cancelText="No"
                     onConfirm={() => { resolve(true); }}

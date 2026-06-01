@@ -21,23 +21,28 @@ export function getMaxFileSizeMB(): number {
     return maxFileSizeMB;
 }
 
-export interface StoredAudioFile {
+/*
+ * `type` is the mimetype of file and is practically useless
+ * unless it differs from the derived one for dataUri
+ *  (even if so, why would we care even)
+ */
+export interface AudioData {
     id: string;
     name: string;
-    type: string;
+    type: string | undefined;
     dataUri: string;
 }
 
-export interface AudioFileMetadata {
+export interface AudioMetadata {
     id: string;
     name: string;
-    type: string;
+    type: string | undefined;
     size: number;
     checksum: string | undefined;
 }
 
-type MetadataStore = Record<string, AudioFileMetadata>;
-type AudioStore = Record<string, StoredAudioFile>;
+type MetadataStore = Record<string, AudioMetadata>;
+type AudioStore = Record<string, AudioData>;
 
 export async function getAllAudioMetadata(): Promise<MetadataStore> {
     return (await get(METADATA_KEY)) as MetadataStore ?? {};
@@ -60,7 +65,7 @@ async function setAudioStore(new_: AudioStore): Promise<void> {
     await set(STORAGE_KEY, new_);
 }
 
-export async function saveAudioData(audioData: [StoredAudioFile, AudioFileMetadata][]): Promise<void> {
+export async function saveAudioData(audioData: [AudioData, AudioMetadata][]): Promise<void> {
     const audioStore = await getAllAudio();
     const metadataStore = await getAllAudioMetadata();
 
@@ -81,11 +86,11 @@ async function getStringHash(input: string) {
         .join("");
 }
 
-export async function processAudioFile(file: File): Promise<[StoredAudioFile, AudioFileMetadata]> {
+export async function processAudioFile(file: File): Promise<[AudioData, AudioMetadata]> {
     const maxBytes = maxFileSizeMB * 1024 * 1024;
     if (file.size > maxBytes) {
         const fileMB = (file.size / (1024 * 1024)).toFixed(1);
-        throw new Error(`File "${file.name}" is too large (${fileMB}MB). Maximum size is ${maxFileSizeMB}MB.`);
+        throw new Error(`"${file.name}" is too large (${fileMB}MB). Maximum size is ${maxFileSizeMB}MB.`);
     }
 
     const buffer = await file.arrayBuffer();
@@ -99,7 +104,7 @@ export async function processAudioFile(file: File): Promise<[StoredAudioFile, Au
     });
 }
 
-export async function importAudioData(data: StoredAudioFile): Promise<[StoredAudioFile, AudioFileMetadata]> {
+export async function importAudioData(data: AudioData): Promise<[AudioData, AudioMetadata]> {
     const { name, type, dataUri } = data;
 
     const maxBytes = maxFileSizeMB * 1024 * 1024;

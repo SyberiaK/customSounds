@@ -29,7 +29,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
     type: SoundType;
     override: SoundOverride;
     onChange: () => Promise<void>;
-    files: Record<string, AudioStore.AudioFileMetadata>;
+    files: Record<string, AudioStore.AudioMetadata>;
     onFilesChange: () => void;
 }) {
     const update = useForceUpdater();

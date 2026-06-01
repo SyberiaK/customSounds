@@ -146,7 +146,7 @@ export function makeEmptyOverride(): SoundOverride {
 export interface ExportedAudioFile {
     id: string;
     name: string;
-    type: string;
+    type: string | undefined;
     dataUri: string;
 }
 
