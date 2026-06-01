@@ -219,13 +219,16 @@ function SoundOverrides() {
             try {
                 const [data, metadata] = await AudioStore.processAudioFile(file);
 
-                if (files[metadata.id]) {
-                    if (!doReplace && repeatForAll) continue;
-                    if (files[metadata.id]?.checksum === metadata?.checksum) continue;
+                if (!files[metadata.id]) {
+                    audioDataToSave.push([data, metadata]);
+                    continue;
+                }
 
-                    if (!repeatForAll) {
-                        [doReplace, repeatForAll] = await resolveReplaceFileModal(data.name);
-                    }
+                if (!doReplace && repeatForAll) continue;
+                if (files[metadata.id]?.checksum === metadata?.checksum) continue;
+
+                if (!repeatForAll) {
+                    [doReplace, repeatForAll] = await resolveReplaceFileModal(data.name);
                 }
 
                 if (doReplace) audioDataToSave.push([data, metadata]);
@@ -286,13 +289,17 @@ function SoundOverrides() {
                         try {
                             const [data, metadata] = await AudioStore.importAudioData(importedFile);
 
-                            if (files[metadata.id]) {
-                                if (!doReplace && repeatForAll) continue;
-                                if (files[metadata.id]?.checksum === metadata?.checksum) continue;
+                            if (!files[metadata.id]) {
+                                audioDataToSave.push([data, metadata]);
+                                newlyAddedAudioIDs.push(metadata.id);
+                                continue;
+                            }
 
-                                if (!repeatForAll) {
-                                    [doReplace, repeatForAll] = await resolveReplaceFileModal(metadata.name);
-                                }
+                            if (!doReplace && repeatForAll) continue;
+                            if (files[metadata.id]?.checksum === metadata?.checksum) continue;
+
+                            if (!repeatForAll) {
+                                [doReplace, repeatForAll] = await resolveReplaceFileModal(data.name);
                             }
 
                             if (doReplace) {
