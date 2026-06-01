@@ -148,33 +148,33 @@ export async function clearStore(): Promise<void> {
 }
 
 async function generateDataURI(buffer: ArrayBuffer, type: string, name: string): Promise<string> {
-    let mimeType = type || "audio/mpeg";
+    let mimeType = type || "";
 
-    if (!mimeType || mimeType === "application/octet-stream" || mimeType.startsWith("video")) {
-        if (name) {
-            const extension = name.split(".").pop()?.toLowerCase();
-            switch (extension) {
-                case "ogg": mimeType = "audio/ogg"; break;
-                case "mp3": mimeType = "audio/mpeg"; break;
-                case "wav": mimeType = "audio/wav"; break;
-                case "m4a":
-                case "mp4": mimeType = "audio/mp4"; break;
-                case "flac": mimeType = "audio/flac"; break;
-                case "aac": mimeType = "audio/aac"; break;
-                case "webm": mimeType = "audio/webm"; break;
-                case "wma": mimeType = "audio/x-ms-wma"; break;
-                default: mimeType = "audio/mpeg";
-            }
+    if (mimeType.startsWith("video/")) mimeType = mimeType.replace("video/", "audio/");
+
+    if ((!mimeType || mimeType === "application/octet-stream") && name.includes(".")) {
+        const extension = name.split(".").pop()!.toLowerCase();
+        switch (extension) {
+            case "ogg": mimeType = "audio/ogg"; break;
+            case "mp3": mimeType = "audio/mpeg"; break;
+            case "wav": mimeType = "audio/wav"; break;
+            case "m4a":
+            case "mp4": mimeType = "audio/mp4"; break;
+            case "flac": mimeType = "audio/flac"; break;
+            case "aac": mimeType = "audio/aac"; break;
+            case "webm": mimeType = "audio/webm"; break;
+            case "wma": mimeType = "audio/x-ms-wma"; break;
         }
     }
 
-    const uint8Array = new Uint8Array(buffer);
-    const blob = new Blob([uint8Array], { type: mimeType });
+    if (!mimeType) mimeType = "audio/mpeg";
+
+    const blob = new Blob([buffer], { type: mimeType });
 
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result as string);
-        reader.onerror = reject;
+        reader.onerror = () => reject(reader.error);
         reader.readAsDataURL(blob);
     });
 }
