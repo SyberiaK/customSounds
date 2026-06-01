@@ -250,6 +250,22 @@ function SoundOverrides() {
 
         if (!file) return;
 
+        if (file.size > HEAVY_EXPORT_THRESHOLD_MB * 1024 * 1024) {
+            const proceed = await new Promise((resolve: (value: boolean) => void) => openModal(props => (
+                <ConfirmModal
+                    {...props}
+                    title="The import is too heavy"
+                    subtitle={`The total size of this import exceeds 100MB (${(file.size / 1024 / 1024).toFixed(1)}MB).
+                                Importing so much data might take a while to process or even cause your Discord client to crash.
+                                Do you wish to proceed?`}
+                    confirmText="Yes"
+                    cancelText="No"
+                    onConfirm={() => { resolve(true); }}
+                />
+            )));
+            if (!proceed) return;
+        }
+
         const reader = new FileReader();
         reader.onload = async (e: ProgressEvent<FileReader>) => {
             resetOverrides();
