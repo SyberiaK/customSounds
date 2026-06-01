@@ -10,7 +10,6 @@ import { FormSwitch } from "@components/FormSwitch";
 import { Heading } from "@components/Heading";
 import { classNameFactory } from "@utils/css";
 import { Logger } from "@utils/Logger";
-import { useForceUpdater } from "@utils/react";
 import { makeRange } from "@utils/types";
 import { findByCodeLazy } from "@webpack";
 import { React, Select, showToast, Slider } from "@webpack/common";
@@ -32,7 +31,6 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
     files: Record<string, AudioStore.AudioMetadata>;
     onFilesChange: () => void;
 }) {
-    const update = useForceUpdater();
     const sound = React.useRef<SoundPlayer | null>(null);
 
     React.useEffect(() => {
@@ -41,11 +39,6 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
             sound.current = null;
         };
     }, []);
-
-    const saveAndNotify = async () => {
-        await onChange();
-        update();
-    };
 
     const previewSound = async () => {
         sound.current?.stop();
@@ -122,7 +115,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
 
         if (override.selectedFileId === id) {
             override.selectedFileId = makeEmptyOverride().selectedFileId;
-            await saveAndNotify();
+            await onChange();
         }
         onFilesChange();
         showToast("File deleted successfully");
@@ -142,7 +135,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                 value={override.enabled || false}
                 onChange={async val => {
                     override.enabled = val;
-                    saveAndNotify();
+                    onChange();
                 }}
                 hideBorder
             />
@@ -166,9 +159,8 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                             initialValue={override.volume}
                             onValueChange={val => {
                                 override.volume = val;
-                                saveAndNotify();
+                                onChange();
                             }}
-                            disabled={!override.enabled}
                         />
                     </div>
                     <div className={cl("card-option")}>
@@ -182,7 +174,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                             isSelected={v => v === override.selectedSound}
                             select={async v => {
                                 override.selectedSound = v;
-                                saveAndNotify();
+                                onChange();
                             }}
                             serialize={opt => opt.value}
                         />
@@ -199,7 +191,7 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                                 isSelected={v => v === (override.selectedFileId || "")}
                                 select={async id => {
                                     override.selectedFileId = id || undefined;
-                                    saveAndNotify();
+                                    onChange();
                                 }}
                                 serialize={opt => opt.value}
                             />

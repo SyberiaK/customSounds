@@ -72,23 +72,15 @@ export async function ensureDataURICached(fileId: string): Promise<string | null
     if (cached) return cached;
 
     const dataUri = await AudioStore.getAudioDataURI(fileId);
-    if (dataUri) {
-        try {
-            dataUriCache.set(fileId, dataUri);
-            return dataUri;
-        } catch (error) {
-            logger.error(`Error loading audio for ${fileId}:`, error);
-        }
+    if (!dataUri) return null;
+
+    try {
+        dataUriCache.set(fileId, dataUri);
+        return dataUri;
+    } catch (error) {
+        logger.error(`Error loading audio for ${fileId}:`, error);
+        return null;
     }
-
-    return null;
-}
-
-export async function refreshDataURI(id: string): Promise<void> {
-    const override = getOverride(id);
-    if (!override?.selectedFileId) return;
-
-    await ensureDataURICached(override.selectedFileId);
 }
 
 async function preloadDataURIs(): Promise<void> {
@@ -611,7 +603,6 @@ export default definePlugin({
     findOverride,
     isOverriden,
     getCustomSoundURL,
-    refreshDataURI,
     ensureDataURICached,
     mentionsEveryone,
     mentionsMe,
