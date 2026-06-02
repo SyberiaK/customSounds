@@ -153,7 +153,7 @@ export async function clearStore(): Promise<void> {
 }
 
 async function generateDataURI(buffer: ArrayBuffer, type: string, name: string): Promise<string> {
-    let mimeType = type || "";
+    let mimeType = type;
 
     if (mimeType.startsWith("video/")) mimeType = mimeType.replace("video/", "audio/");
 

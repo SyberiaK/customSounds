@@ -70,10 +70,9 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
             return;
         }
 
-        const mimeMatch = dataUri.match(/^data:(audio\/[^;,]+)/i);
-        const mimeType = mimeMatch ? mimeMatch[1] : "audio/mpeg";
+        const mimeType = dataUri.match(/^data:(audio\/[^;,]+)/i)?.[1] ?? "audio/mpeg";
         const testEl = document.createElement("audio");
-        if (testEl.canPlayType(mimeType) === "") {
+        if (!testEl.canPlayType(mimeType)) {
             showToast("Your browser doesn't support this format. Try re-uploading as MP3 or WAV.");
             return;
         }
@@ -100,13 +99,13 @@ export function SoundOverrideComponent({ type, override, onChange, files, onFile
                 },
                 loop: () => { audio.loop = true; }
             };
-        } catch (error: unknown) {
-            const err = error as Error;
+        } catch (e) {
+            const err = e as Error;
             const msg = err?.name === "NotSupportedError" || err?.message?.includes("supported source")
                 ? "Format not supported by browser. Try MP3 or WAV."
                 : "Could not play file. It may be corrupted or in an unsupported format.";
             showToast(msg);
-            logger.error("Error in previewSound:", error);
+            logger.error("Error in previewSound:", e);
         }
     };
 

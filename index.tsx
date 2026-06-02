@@ -24,7 +24,7 @@ import { SoundOverrideComponent } from "./SoundOverrideComponent";
 import { ExportedAudioFile, makeEmptyOverride, SettingsExport, SOUND_TYPES, SoundOverride } from "./types";
 
 // todo: is aac actually supported in any browser?
-const AUDIO_EXTENSIONS = ["mp3", "wav", "ogg", "m4a", "aac", "flac", "webm", "wma", "mp4", "opus"];
+const AUDIO_EXTENSIONS: readonly string[] = ["mp3", "wav", "ogg", "m4a", "aac", "flac", "webm", "wma", "mp4", "opus"];
 const MAX_FILE_SIZE_MB = 30; // at 320 kbps = 12:30 of music, there is no way you'd need more
 const HEAVY_EXPORT_THRESHOLD_MB = 100;
 
@@ -83,8 +83,8 @@ export async function ensureDataURICached(fileId: string): Promise<string | null
     }
 }
 
-async function preloadDataURIs(): Promise<void> {
-    const fileIdsToPreload = new Set<string>(
+async function preloadDataURIs() {
+    const fileIdsToPreload = new Set(
         allSoundTypes
             .map(soundType => getOverride(soundType.id))
             .filter(override => override?.enabled && override.selectedSound === "custom" && override.selectedFileId)
@@ -193,10 +193,8 @@ function SoundOverrides() {
 
         const filteredFiles: File[] = [];
         for (const file of selectedFiles) {
-            if (!file) continue;
-
             const fileExtension = file.name.split(".").pop()?.toLowerCase();
-            if (!fileExtension || !AUDIO_EXTENSIONS.includes(fileExtension)) {
+            if (!file.name.includes(".") || !fileExtension || !AUDIO_EXTENSIONS.includes(fileExtension)) {
                 showToast(`Invalid file type of "${file.name}". Please upload only audio files (${audioExtensionsString}).`, Toasts.Type.FAILURE);
                 continue;
             }
@@ -318,15 +316,14 @@ function SoundOverrides() {
                 const filesMissing: ({ id: string; } & SoundOverride)[] = [];
                 if (Array.isArray(imported?.overrides)) {
                     for (const setting of imported.overrides) {
-                        if (!setting.id) continue;
+                        if (!allSoundTypes.some(type => type.id === setting.id)) continue;
 
-                        const override: SoundOverride = {
+                        setOverride(setting.id, {
                             enabled: setting.enabled ?? empty.enabled,
                             selectedSound: setting.selectedSound ?? empty.selectedSound,
                             selectedFileId: setting.selectedFileId ?? empty.selectedFileId,
                             volume: setting.volume ?? empty.volume,
-                        };
-                        setOverride(setting.id, override);
+                        });
 
                         if (!setting.selectedFileId) continue;
                         if (!files[setting.selectedFileId] && !newlyAddedAudioIDs.includes(setting.selectedFileId)) filesMissing.push(setting);
@@ -347,13 +344,12 @@ function SoundOverrides() {
                             onConfirm={() => { audioFilesInputRef.current?.click(); }}
                             onCancel={() => {
                                 filesMissing.forEach(setting => {
-                                    const override: SoundOverride = {
+                                    setOverride(setting.id, {
                                         enabled: setting.enabled,
                                         selectedSound: setting.selectedSound,
                                         selectedFileId: empty.selectedFileId,
                                         volume: setting.volume,
-                                    };
-                                    setOverride(setting.id, override);
+                                    });
                                 });
                             }}
                         />
@@ -375,13 +371,14 @@ function SoundOverrides() {
     };
 
     const downloadSettings = async () => {
+        const empty = makeEmptyOverride();
         const overrides = allSoundTypes.map(type => {
             const override = getOverride(type.id);
             return {
                 id: type.id,
                 enabled: override.enabled,
                 selectedSound: override.selectedSound,
-                selectedFileId: override.selectedFileId ?? makeEmptyOverride().selectedFileId,
+                selectedFileId: override.selectedFileId ?? empty.selectedFileId,
                 volume: override.volume
             };
         }).filter(o => o.enabled || o.selectedSound !== "default");
