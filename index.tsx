@@ -561,7 +561,7 @@ export default definePlugin({
     settings,
     patches: [
         {
-            find: 'Error("could not play audio")',
+            find: "could not play audio",
             replacement: [
                 {
                     match: /(?<=new Audio;\i\.src=)\i\([0-9]+\)\(`\.\/\$\{this\.name\}\.mp3`\)/,
