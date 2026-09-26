@@ -19,7 +19,6 @@ import { MessageJSON, RenderModalProps } from "@vencord/discord-types";
 import { ConfirmModal, openModal, React, showToast, TextInput, Toasts, UserStore } from "@webpack/common";
 
 import * as AudioStore from "./audioStore";
-import { LRU } from "./cache";
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
 import { ExportedAudioFile, makeEmptyOverride, SettingsExport, SOUND_TYPES, SoundOverride } from "./types";
 
@@ -34,7 +33,7 @@ const cl = classNameFactory("vc-custom-sounds-");
 
 const allSoundTypes = SOUND_TYPES || [];
 
-const dataUriCache = new LRU();
+const dataUriCache = new Map<string, string>();
 const logger = new Logger("CustomSounds");
 
 function getOverride(id: string): SoundOverride {
@@ -74,13 +73,8 @@ export async function ensureDataURICached(fileId: string): Promise<string | null
     const dataUri = await AudioStore.getAudioDataURI(fileId);
     if (!dataUri) return null;
 
-    try {
-        dataUriCache.set(fileId, dataUri);
-        return dataUri;
-    } catch (error) {
-        logger.error(`Error loading audio for ${fileId}:`, error);
-        return null;
-    }
+    dataUriCache.set(fileId, dataUri);
+    return dataUri;
 }
 
 async function preloadDataURIs() {
@@ -607,7 +601,6 @@ export default definePlugin({
 
     async start() {
         AudioStore.setMaxFileSizeMB(MAX_FILE_SIZE_MB);
-        dataUriCache.setSizeLimit(MAX_FILE_SIZE_MB);
 
         await preloadDataURIs();
     },
