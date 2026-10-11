@@ -20,7 +20,7 @@ import { ConfirmModal, openModal, React, showToast, TextInput, UserStore } from 
 
 import * as AudioStore from "./audioStore";
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
-import { ExportedAudioFile, makeEmptyOverride, SettingsExport, SOUND_TYPES, SoundOverride } from "./types";
+import { makeEmptyOverride, SettingsExport, SOUND_TYPES, SoundOverride } from "./types";
 
 // todo: is aac actually supported in any browser?
 const AUDIO_EXTENSIONS: readonly string[] = ["mp3", "wav", "ogg", "m4a", "aac", "flac", "webm", "wma", "mp4", "opus"];
@@ -234,15 +234,15 @@ function SoundOverrides() {
 
     const handleSettingsUpload = async () => {
         const file = await chooseFile(".json");
-
         if (!file) return;
 
-        if (file.size > HEAVY_EXPORT_THRESHOLD_MB * 1024 * 1024) {
+        const size = file.size / 1024 / 1024;
+        if (size > HEAVY_EXPORT_THRESHOLD_MB) {
             const proceed = await new Promise((resolve: (value: boolean) => void) => openModal(props => (
                 <ConfirmModal
                     {...props}
                     title="The import is too heavy"
-                    subtitle={`The total size of this import exceeds 100MB (${(file.size / 1024 / 1024).toFixed(1)}MB).
+                    subtitle={`The total size of this import exceeds ${HEAVY_EXPORT_THRESHOLD_MB}MB (${size.toFixed(1)}MB).
                                 Importing so much data might take a while to process or even cause your Discord client to crash.
                                 Do you wish to proceed?`}
                     confirmText="Yes"
@@ -399,13 +399,13 @@ function SoundOverrides() {
             if (includeAll) usedFiles = allFiles;
         }
 
-        const totalSize = Array.from(usedFiles).reduce((acc, val) => acc + files[val].size, 0);
-        if (totalSize > HEAVY_EXPORT_THRESHOLD_MB * 1024 * 1024) {
+        const totalSize = Array.from(usedFiles).reduce((acc, val) => acc + files[val].size, 0) / 1024 / 1024;
+        if (totalSize > HEAVY_EXPORT_THRESHOLD_MB) {
             const proceed = await new Promise((resolve: (value: boolean) => void) => openModal(props => (
                 <ConfirmModal
                     {...props}
                     title="The export is too heavy"
-                    subtitle={`The total size of exported files exceeds 100MB (${(totalSize / 1024 / 1024).toFixed(1)}MB).
+                    subtitle={`The total size of exported files exceeds ${HEAVY_EXPORT_THRESHOLD_MB}MB (${totalSize.toFixed(1)}MB).
                                 Exporting (and later on, importing) so much data might take a while to process
                                 or even cause your Discord client to crash.
                                 Do you wish to proceed?`}
@@ -418,13 +418,9 @@ function SoundOverrides() {
         }
 
         const audioData = await AudioStore.getAllAudio();
-        const filesToBundle: ExportedAudioFile[] = Array.from(usedFiles)
-            .filter(id => audioData[id]?.dataUri)
-            .map(id => audioData[id]);
-
         const exportPayload: SettingsExport = {
             overrides,
-            files: filesToBundle
+            files: Array.from(usedFiles).filter(id => audioData[id]?.dataUri).map(id => audioData[id])
         };
 
         showToast(`Exporting ${overrides.length} settings and ${exportPayload.files.length} files...`);

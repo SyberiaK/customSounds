@@ -17,10 +17,6 @@ export function setMaxFileSizeMB(sizeMB: number): void {
     maxFileSizeMB = sizeMB;
 }
 
-export function getMaxFileSizeMB(): number {
-    return maxFileSizeMB;
-}
-
 /*
  * `type` is the mimetype of file and is practically useless
  * unless it differs from the derived one for dataUri
@@ -87,10 +83,9 @@ async function getStringHash(input: string) {
 }
 
 export async function processAudioFile(file: File): Promise<[AudioData, AudioMetadata]> {
-    const maxBytes = maxFileSizeMB * 1024 * 1024;
-    if (file.size > maxBytes) {
-        const fileMB = (file.size / (1024 * 1024)).toFixed(1);
-        throw new Error(`"${file.name}" is too large (${fileMB}MB). Maximum size is ${maxFileSizeMB}MB.`);
+    if (file.size > maxFileSizeMB * 1024 * 1024) {
+        const fileMB = file.size / 1024 / 1024;
+        throw new Error(`"${file.name}" is too large (${fileMB.toFixed(1)}MB). Maximum size is ${maxFileSizeMB}MB.`);
     }
 
     const buffer = await file.arrayBuffer();
@@ -107,10 +102,9 @@ export async function processAudioFile(file: File): Promise<[AudioData, AudioMet
 export async function importAudioData(data: AudioData): Promise<[AudioData, AudioMetadata]> {
     const { name, type, dataUri } = data;
 
-    const maxBytes = maxFileSizeMB * 1024 * 1024;
-    if (dataUri.length / BASE64_OVERHEAD > maxBytes) {
-        const fileMB = (dataUri.length / (1024 * 1024) / BASE64_OVERHEAD).toFixed(1);
-        throw new Error(`File "${name}" is too large (${fileMB}MB). Maximum size is ${maxFileSizeMB}MB.`);
+    if (dataUri.length / BASE64_OVERHEAD > maxFileSizeMB * 1024 * 1024) {
+        const fileMB = dataUri.length / 1024 / 1024 / BASE64_OVERHEAD;
+        throw new Error(`"${name}" is too large (${fileMB.toFixed(1)}MB). Maximum size is ${maxFileSizeMB}MB.`);
     }
 
     const id = data.id || name;
@@ -155,8 +149,6 @@ export async function clearStore(): Promise<void> {
 async function generateDataURI(buffer: ArrayBuffer, type: string, name: string): Promise<string> {
     let mimeType = type;
 
-    if (mimeType.startsWith("video/")) mimeType = mimeType.replace("video/", "audio/");
-
     if ((!mimeType || mimeType === "application/octet-stream") && name.includes(".")) {
         const extension = name.split(".").pop()!.toLowerCase();
         switch (extension) {
@@ -173,6 +165,8 @@ async function generateDataURI(buffer: ArrayBuffer, type: string, name: string):
     }
 
     if (!mimeType) mimeType = "audio/mpeg";
+
+    if (mimeType.startsWith("video/")) mimeType = mimeType.replace("video/", "audio/");
 
     const blob = new Blob([buffer], { type: mimeType });
 
