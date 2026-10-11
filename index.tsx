@@ -16,7 +16,7 @@ import { Logger } from "@utils/Logger";
 import definePlugin, { OptionType, StartAt } from "@utils/types";
 import { chooseFile, saveFile } from "@utils/web";
 import { MessageJSON, RenderModalProps } from "@vencord/discord-types";
-import { ConfirmModal, openModal, React, showToast, TextInput, Toasts, UserStore } from "@webpack/common";
+import { ConfirmModal, openModal, React, showToast, TextInput, UserStore } from "@webpack/common";
 
 import * as AudioStore from "./audioStore";
 import { SoundOverrideComponent } from "./SoundOverrideComponent";
@@ -172,7 +172,7 @@ function SoundOverrides() {
 
         await loadFiles();
 
-        showToast("Files removed successfully.", Toasts.Type.SUCCESS);
+        showToast("Files removed successfully.", "success");
     };
 
     const resetOverrides = () => {
@@ -189,7 +189,7 @@ function SoundOverrides() {
         for (const file of selectedFiles) {
             const fileExtension = file.name.split(".").pop()?.toLowerCase();
             if (!file.name.includes(".") || !fileExtension || !AUDIO_EXTENSIONS.includes(fileExtension)) {
-                showToast(`Invalid file type of "${file.name}". Please upload only audio files (${audioExtensionsString}).`, Toasts.Type.FAILURE);
+                showToast(`Invalid file type of "${file.name}". Please upload only audio files (${audioExtensionsString}).`, "failure");
                 continue;
             }
             filteredFiles.push(file);
@@ -219,7 +219,7 @@ function SoundOverrides() {
             } catch (e) {
                 logger.error("Upload error:", e);
                 const message = e instanceof Error ? e.message : "Unknown error";
-                showToast(message.includes("too large") ? message : `Upload of "${file.name}" failed: ${message}`, Toasts.Type.FAILURE);
+                showToast(message.includes("too large") ? message : `Upload of "${file.name}" failed: ${message}`, "failure");
                 continue;
             }
         }
@@ -228,7 +228,7 @@ function SoundOverrides() {
         for (const [data] of audioDataToSave) await ensureDataURICached(data.id);
 
         await loadFiles();
-        showToast(`Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`, Toasts.Type.SUCCESS);
+        showToast(`Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`, "success");
         event.target.value = "";
     };
 
@@ -293,7 +293,7 @@ function SoundOverrides() {
                         } catch (e) {
                             logger.error("Import error:", e);
                             const message = e instanceof Error ? e.message : "Unknown error";
-                            showToast(message.includes("too large") ? message : `Import of "${importedFile.name}" failed: ${message}`, Toasts.Type.FAILURE);
+                            showToast(message.includes("too large") ? message : `Import of "${importedFile.name}" failed: ${message}`, "failure");
                             continue;
                         }
                     }
@@ -303,7 +303,7 @@ function SoundOverrides() {
 
                     await loadFiles();
 
-                    showToast(`Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`, Toasts.Type.SUCCESS);
+                    showToast(`Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`, "success");
                 }
 
                 const empty = makeEmptyOverride();
@@ -350,12 +350,12 @@ function SoundOverrides() {
                     ));
                 }
 
-                showToast("Settings imported successfully!", Toasts.Type.SUCCESS);
+                showToast("Settings imported successfully!", "success");
             } catch (e) {
                 if (e instanceof SyntaxError) {
-                    showToast("Error importing settings: the file is not valid JSON.", Toasts.Type.FAILURE);
+                    showToast("Error importing settings: the file is not valid JSON.", "failure");
                 } else {
-                    showToast("Error importing settings. Check console for details.", Toasts.Type.FAILURE);
+                    showToast("Error importing settings. Check console for details.", "failure");
                     logger.error("Error importing settings:", e);
                 }
             }
@@ -427,7 +427,7 @@ function SoundOverrides() {
             files: filesToBundle
         };
 
-        showToast(`Exporting ${overrides.length} settings and ${filesToBundle.length} files...`);
+        showToast(`Exporting ${overrides.length} settings and ${exportPayload.files.length} files...`);
         saveFile(new File(
             [JSON.stringify(exportPayload, null, 2)],
             "customSounds-settings.json",
@@ -469,7 +469,7 @@ function SoundOverrides() {
                     <Button variant="secondary" onClick={downloadSettings}>Export</Button>
                     <Button variant="dangerPrimary" onClick={() => {
                         resetOverrides();
-                        showToast("All overrides reset successfully!", Toasts.Type.SUCCESS);
+                        showToast("All overrides reset successfully!", "success");
                     }}
                     >
                         Reset All</Button>
