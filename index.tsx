@@ -573,18 +573,17 @@ export default definePlugin({
         {
             find: ".connectHasStarted",
             replacement: {
-                match: /return;return"user_join"/,
-                replace: 'return;return $self.isOverriden("connect") ? "connect" : "user_join"'
+                match: /return"user_join"/,
+                replace: 'return $self.isOverriden("connect") ? "connect" : "user_join"',
+                all: true
             }
         },
         {
-            find: ".getDesktopType()===",
-            replacement: [
-                {
-                    match: /sound:(\i\?\i:void 0,volume:\i,onClick)/,
-                    replace: 'sound: $self.mentionsEveryone(arguments[0]?.message) && $self.isOverriden("mention2") ? "mention2" : $self.mentionsMe(arguments[0]?.message) && $self.isOverriden("user_mentioned") ? "user_mentioned" : $1'
-                }
-            ]
+            find: "predicate should fail if no soundpack is available",
+            replacement: {
+                match: /sound:"message1"/,
+                replace: 'sound: $self.mentionsEveryone(arguments[0]?.message) && $self.isOverriden("mention2") ? "mention2" : $self.mentionsMe(arguments[0]?.message) && $self.isOverriden("user_mentioned") ? "user_mentioned" : "message1"'
+            }
         }
     ],
     findOverride,
