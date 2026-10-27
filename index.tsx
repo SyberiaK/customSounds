@@ -172,7 +172,7 @@ function SoundOverrides() {
 
         await loadFiles();
 
-        showToast("Files removed successfully.", "success");
+        showToast({ text: "Files removed successfully.", variant: "success" });
     };
 
     const resetOverrides = () => {
@@ -183,13 +183,13 @@ function SoundOverrides() {
         const selectedFiles = event.target.files;
         if (!selectedFiles) return;
 
-        showToast(selectedFiles.length > 1 ? `Uploading ${selectedFiles.length} files...` : "Uploading file...");
+        showToast({ text: selectedFiles.length > 1 ? `Uploading ${selectedFiles.length} files...` : "Uploading file..." });
 
         const filteredFiles: File[] = [];
         for (const file of selectedFiles) {
             const fileExtension = file.name.split(".").pop()?.toLowerCase();
             if (!file.name.includes(".") || !fileExtension || !AUDIO_EXTENSIONS.includes(fileExtension)) {
-                showToast(`Invalid file type of "${file.name}". Please upload only audio files (${audioExtensionsString}).`, "failure");
+                showToast({ text: `Invalid file type of "${file.name}". Please upload only audio files (${audioExtensionsString}).`, variant: "critical" });
                 continue;
             }
             filteredFiles.push(file);
@@ -219,7 +219,7 @@ function SoundOverrides() {
             } catch (e) {
                 logger.error("Upload error:", e);
                 const message = e instanceof Error ? e.message : "Unknown error";
-                showToast(message.includes("too large") ? message : `Upload of "${file.name}" failed: ${message}`, "failure");
+                showToast({ text: message.includes("too large") ? message : `Upload of "${file.name}" failed: ${message}`, variant: "critical" });
                 continue;
             }
         }
@@ -228,7 +228,7 @@ function SoundOverrides() {
         for (const [data] of audioDataToSave) await ensureDataURICached(data.id);
 
         await loadFiles();
-        showToast(`Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`, "success");
+        showToast({ text: `Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`, variant: "success" });
         event.target.value = "";
     };
 
@@ -293,7 +293,7 @@ function SoundOverrides() {
                         } catch (e) {
                             logger.error("Import error:", e);
                             const message = e instanceof Error ? e.message : "Unknown error";
-                            showToast(message.includes("too large") ? message : `Import of "${importedFile.name}" failed: ${message}`, "failure");
+                            showToast({ text: message.includes("too large") ? message : `Import of "${importedFile.name}" failed: ${message}`, variant: "critical" });
                             continue;
                         }
                     }
@@ -303,7 +303,7 @@ function SoundOverrides() {
 
                     await loadFiles();
 
-                    showToast(`Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`, "success");
+                    showToast({ text: `Added ${audioDataToSave.length} file${audioDataToSave.length !== 1 ? "s" : ""}.`, variant: "success" });
                 }
 
                 const empty = makeEmptyOverride();
@@ -350,12 +350,12 @@ function SoundOverrides() {
                     ));
                 }
 
-                showToast("Settings imported successfully!", "success");
+                showToast({ text: "Settings imported successfully!", variant: "success" });
             } catch (e) {
                 if (e instanceof SyntaxError) {
-                    showToast("Error importing settings: the file is not valid JSON.", "failure");
+                    showToast({ text: "Error importing settings: the file is not valid JSON.", variant: "critical" });
                 } else {
-                    showToast("Error importing settings. Check console for details.", "failure");
+                    showToast({ text: "Error importing settings. Check console for details.", variant: "critical" });
                     logger.error("Error importing settings:", e);
                 }
             }
@@ -423,7 +423,7 @@ function SoundOverrides() {
             files: Array.from(usedFiles).filter(id => audioData[id]?.dataUri).map(id => audioData[id])
         };
 
-        showToast(`Exporting ${overrides.length} settings and ${exportPayload.files.length} files...`);
+        showToast({ text: `Exporting ${overrides.length} settings and ${exportPayload.files.length} files...` });
         saveFile(new File(
             [JSON.stringify(exportPayload, null, 2)],
             "customSounds-settings.json",
@@ -465,7 +465,7 @@ function SoundOverrides() {
                     <Button variant="secondary" onClick={downloadSettings}>Export</Button>
                     <Button variant="dangerPrimary" onClick={() => {
                         resetOverrides();
-                        showToast("All overrides reset successfully!", "success");
+                        showToast({ text: "All overrides reset successfully!", variant: "success" });
                     }}
                     >
                         Reset All</Button>
